@@ -33,11 +33,11 @@ import "../components"
 
 Item {
     id: root
-    z: -9
 
     property var stage
     onStageChanged: {
-        if(stage === 5 || stage === "aeroShellLoaded") {
+        // stage is a string in aeroshell-splash
+        if (stage === 5 || stage === "aeroShellLoaded") {
             fadeExit.start();
         }
     }
@@ -49,7 +49,7 @@ Item {
         ScriptAction {
             script: {
                 // for aeroshell-splash
-                if(splashApp) {
+                if (splashApp) {
                     splashApp.exit();
                 }
             }
@@ -65,15 +65,19 @@ Item {
 
     Image {
         id: bg
+
         anchors.fill: parent
+
         fillMode: Image.Stretch
         source: sddm.currentBackground
     }
 
     Status {
         id: statusText
+
         anchors.centerIn: parent
         anchors.verticalCenterOffset: -36
+
         statusText: i18nd("okular", "Welcome")
         speen: true
     }
@@ -83,7 +87,6 @@ Item {
 
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 48 - (height / 2)
-
         anchors.horizontalCenter: parent.horizontalCenter
 
         source: "../images/watermark.png"

@@ -316,7 +316,9 @@ Item {
 
     Timer {
         id: loadDelay
-        interval: 500
+
+        // this is the middle point between being too fast for my celeron and being too slow for faster devices
+        interval: 1000
         onTriggered: {
             DBus.SessionBus.asyncCall({
                 service: "org.kde.KSplash",
