@@ -99,16 +99,14 @@ void Sidebar::setWindow(QQuickWindow *window)
 
         m_window = nullptr;
         m_layerWindow = nullptr;
+        m_shellWindow = nullptr;
     }
 
     m_window = window;
     m_layerWindow = LayerShellQt::Window::get(window);
+    m_shellWindow = PlasmaShellWaylandIntegration::get(window);
 
     connect(m_window, &QQuickWindow::visibleChanged, this, &Sidebar::configureWindow);
-    connect(m_window, &QQuickWindow::xChanged,       this, &Sidebar::configureWindow);
-    connect(m_window, &QQuickWindow::yChanged,       this, &Sidebar::configureWindow);
-    connect(m_window, &QQuickWindow::widthChanged,   this, &Sidebar::configureWindow);
-    connect(m_window, &QQuickWindow::heightChanged,  this, &Sidebar::configureWindow);
 
     Q_EMIT windowChanged();
 }
@@ -230,7 +228,7 @@ void Sidebar::configureWindow()
             m_docked = true;
         }
     } else {
-        if (m_layerWindow) {
+        if (m_layerWindow && m_shellWindow) {
             LayerShellQt::Window::Anchors anchors;
             anchors.setFlag(LayerShellQt::Window::AnchorTop);
             anchors.setFlag(LayerShellQt::Window::AnchorBottom);
@@ -242,15 +240,19 @@ void Sidebar::configureWindow()
             }
 
             m_layerWindow->setAnchors(anchors);
-            m_layerWindow->setLayer(LayerShellQt::Window::LayerBottom);
+            m_shellWindow->setPanelBehavior(QtWayland::org_kde_plasma_surface::panel_behavior_always_visible);
 
             if (!m_reserveScreenArea && m_docked) {
                 m_layerWindow->setExclusiveZone(0);
+                m_layerWindow->setLayer(LayerShellQt::Window::LayerBottom);
+                m_layerWindow->setScope(QStringLiteral(""));
                 m_docked = false;
             }
 
             if (m_reserveScreenArea) {
                 m_layerWindow->setExclusiveZone(rect.width());
+                m_layerWindow->setLayer(LayerShellQt::Window::LayerTop);
+                m_layerWindow->setScope(QStringLiteral("dock"));
                 m_docked = true;
             }
         }

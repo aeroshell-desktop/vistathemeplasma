@@ -217,7 +217,6 @@ Alternatively, logs can be retrieved graphically from systemd's journal by using
 - [msstyleEditor](https://github.com/nptr/msstyleEditor) - Useful for viewing and modifying msstyle themes on Windows
 - [Plasma SDK](https://github.com/KDE/plasma-sdk) - Features several useful applications for Plasma development 
 - [Qt Creator](https://www.qt.io/product/development-tools) - IDE for Qt applications, useful for QtWidgets codebases and standalone KDE projects
-- [RccExtended](https://github.com/zedxxx/rccextended) - Required for editing SMOD resource files
 - [ResourceHacker](https://www.angusj.com/resourcehacker/) - Useful for viewing and extracting resources from Windows
 
 ## External references
@@ -241,8 +240,7 @@ Some of these issues are fixable but not a lot of effort has been put into doing
 2. Certain animation effects play for certain windows even though they shouldn't, this is usually caused by different window identification and/or the inability to identify such windows (As the first issue points out). Most of these can likely be fixed in the future. 
 3. VistaTasks uses window positioning to animate its Windows 7-like jumplists which isn't smooth or reliable on Wayland, as client-side window positioning on Wayland is not supported as part of the protocol spec. (See [xx-zones](https://gitlab.freedesktop.org/wayland/wayland-protocols/-/merge_requests/264) for more insight on the state of window positioning on Wayland). This is arguably bad practice in any case and should be replaced with some kind of KWin effect that actually performs the sliding animation.
 4. VistaTasks jumplists (and context menus in general) cannot steal mouse inputs from all other windows, which might potentially result in strange behavior.
-5. VistaStart's blur region often lags behind or doesn't appear at all upon opening the menu. This can likely be fixed by restructuring VistaStart in some way, but not much time has been spent fixing this bug. 
-6. VistaStart's floating orb positioning fails only sometimes. Additionally, because Wayland doesn't allow client windows to raise themselves, in some cases the floating orb will appear permanently stuck underneath the panel and its child windows until the shell is restarted.
+5. VistaStart's floating orb positioning fails only sometimes. Additionally, because Wayland doesn't allow client windows to raise themselves, in some cases the floating orb will appear permanently stuck underneath the panel and its child windows until the shell is restarted.
 6. Aero Peek is not visible on Wayland, although the windows do properly fade in and out of view. This should most likely be replaced with a proper KWin effect that renders the Aero Peek windows in place of regular windows. 
 7. HiDPI is not properly supported for SMOD. See #252 for more details. This is an issue for both X11 and Wayland, but X11 has an easier workaround as KDecoration3 on X11 ignores DPI scaling entirely.
 

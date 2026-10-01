@@ -1,15 +1,11 @@
 add_definitions(-DTRANSLATION_DOMAIN=\"plasma_applet_io.gitgud.catpswin56.sidebar\")
 
-if (Qt6_VERSION VERSION_GREATER_EQUAL "6.8.0")
-    set(private_code_option  "PRIVATE_CODE")
-endif()
-
 add_library(io.gitgud.catpswin56.sidebar MODULE sidebar.cpp)
 qt_generate_wayland_protocol_client_sources(io.gitgud.catpswin56.sidebar
     FILES
         "${PLASMA_WAYLAND_PROTOCOLS_DIR}/plasma-shell.xml"
         "${Wayland_DATADIR}/wayland.xml"
-    ${private_code_option}
+    PRIVATE_CODE
 )
 
 target_link_libraries(io.gitgud.catpswin56.sidebar

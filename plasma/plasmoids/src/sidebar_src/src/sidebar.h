@@ -14,6 +14,7 @@
 #include <QQuickWindow>
 
 #include <Plasma/Containment>
+#include <PlasmaQuick/PlasmaShellWaylandIntegration>
 
 namespace LayerShellQt
 {
@@ -81,6 +82,7 @@ private:
     bool m_positionRight = false;
 
     LayerShellQt::Window *m_layerWindow = nullptr;
+    PlasmaShellWaylandIntegration *m_shellWindow = nullptr;
 };
 
 #endif
