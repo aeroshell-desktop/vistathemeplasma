@@ -151,6 +151,11 @@
     <entry name="plasmoidPositions" type="String">
       <default>[]</default>
     </entry>
+
+    <entry name="useTypeAhead" type="Bool">
+      <label>Select icons on the desktop by typing their names.</label>
+      <default>true</default>
+    </entry>
   </group>
 
   <group name="Watermark">

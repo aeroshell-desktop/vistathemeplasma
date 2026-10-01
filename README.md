@@ -9,15 +9,13 @@ This is a fork of [WackyIdeas](https://gitgud.io/wackyideas/)' [AeroThemePlasma]
 VTP is in constant development and testing. So far it has been tested on:
 
 1. Arch Linux x64 and other Arch derivatives
-2. Plasma 6.7.2, KDE Frameworks 6.27.0, Qt 6.11.1
+2. Plasma 6.7.5, KDE Frameworks 6.30.0, Qt 6.11.2
 3. 96 DPI scaling, single monitor
 4. X11, Wayland*
 
-*VistaThemePlasma currently lacks full Wayland support, which may result in Wayland-specific issues. 
+*VistaThemePlasma currently lacks full Wayland support, which may result in Wayland-specific issues. Proper Wayland support is planned for Plasma 6.8
 
 ## This software comes "as is" without warranty of any kind. It's always recommended to make backups of your system just in case. I am not responsible for broken systems, please proceed with caution.
-
-[![](https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/ZDeT6vdqMp)
 
 [VistaThemePlasma](https://github.com/aeroshell-desktop/vistathemeplasma) and all of its AeroShell components are available as read-only [GitHub mirrors](https://github.com/aeroshell-desktop/).
 
@@ -48,18 +46,30 @@ Many thanks to the people who helped out by testing and providing some suggestio
 - [AeroThemePlasma](https://gitgud.io/aeroshell/atp/aerothemeplasma) by [WackyIdeas](https://gitgud.io/wackyideas)
 - [Ice2K.sys](https://toiletflusher.neocities.org/ice2k/) by 0penrc
 
-## Aero apps for VistaThemePlasma
+## Aero apps for AeroThemePlasma
+To install most of these, the commands to run after cloning are: `mkdir build; cd build; cmake .. -DCMAKE_INSTALL_PREFIX=/usr; sudo make install`.
+
+### Complete re-creations
+- [Linux Explorer](https://github.com/actuallyaridan/linux-explorer) by ActuallyAridan
+- [Control Panel](https://github.com/actuallyaridan/linux-control) by ActuallyAridan
+- [Device Manager](https://github.com/actuallyaridan/linux-devmgmt) by ActuallyAridan
+- [Windows 7 Minesweeper](https://github.com/actuallyaridan/linux-minesweeper) by ActuallyAridan
+- [TuxManager](https://github.com/benapetr/TuxManager) (task manager) by benapetr
+- [Gadgets](https://gitgud.io/catpswin56/win-gadgets) by catpswin56
+- [execbin](https://gitgud.io/catpswin56/execbin) (run dialog) by catpswin56
+- [LinVer](https://gitgud.io/wackyideas/linver) (version dialog)
+
+### KDE app forks
 - [Aero Dolphin](https://gitgud.io/atmk/dolphin-aero) by Albert Tomanek
 - [Aero GwenView](https://gitgud.io/atmk/gwenview-aero) by Albert Tomanek
 - [Aero KolourPaint](https://invent.kde.org/albert-tomanek/kolourpaint/-/tree/saribbon-aero) by Albert Tomanek
-- [Gadgets](https://gitgud.io/catpswin56/win-gadgets) by me
-- [WinXplorer](https://gitgud.io/catpswin56/winxplorer) by me (unmaintained)
-- [ExecBin](https://gitgud.io/catpswin56/execbin) (run dialog) by me
-- [LinVer](https://gitgud.io/wackyideas/linver) (version dialog) by WackyIdeas
-- [Device Manager](https://github.com/actuallyaridan/linux-devmgmt) by ActuallyAridan
-- ~~[Sevulet](https://gitgud.io/snailatte/sevulet) by [snailatte](https://gitgud.io/snailatte)~~
 
-To install most of these, the commands to run after cloning are: `mkdir build; cd build; cmake .. -DCMAKE_INSTALL_PREFIX=/usr; sudo make install`.
+### Other Aero Apps
+- [Aero App Store](https://gitgud.io/atmk/app-store/-/tree/flatpak?ref_type=heads) by Albert Tomanek
+
+### Development Libraries
+- [libAeroQt](https://gitgud.io/atmk/libaero-qt) -- Re-usable QtWidgets and QML components for writing Aero apps. Also contains function to make glassy window headers.
+- [SARibbon](https://github.com/czyt1988/SARibbon) -- Ribbon control for Qt. Gets styled by libAeroQt.
 
 ## Screenshots
 
