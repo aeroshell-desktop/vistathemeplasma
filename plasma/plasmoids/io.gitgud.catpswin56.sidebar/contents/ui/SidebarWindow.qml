@@ -7,12 +7,25 @@ Window {
 
     required property ContainmentItem root
 
+    // BEGIN X11
+    property var screenRect: Plasmoid.availableScreenRect
+    onScreenRectChanged: setPos();
+    // END X11
+
     width: root.sidebarWidth
     height: Plasmoid.availableScreenRect.height
 
     title: "Windows Sidebar"
     flags: Qt.FramelessWindowHint
     color: "transparent"
+
+    // BEGIN X11
+    onVisibleChanged: {
+        if(visible) {
+            setPos();
+        }
+    }
+    // END X11
 
     // TODO: move this to a kwin effect instead
     SequentialAnimation {
@@ -27,6 +40,17 @@ Window {
         }
         ScriptAction { script: { window.visible = !root.sidebarCollapsed; } }
     }
+
+    // BEGIN X11
+    function setPos() {
+        var availableScreenSpace = Plasmoid.availableScreenRect;
+
+        if(root.sidebarLocation) x = availableScreenSpace.x;
+        else x = (availableScreenSpace.width + availableScreenSpace.x) - width;
+
+        y = availableScreenSpace.y;
+    }
+    // END X11
 
     function openClose() {
         var availableScreenSpace = Plasmoid.availableScreenRect;
