@@ -9,7 +9,7 @@ This is a fork of [WackyIdeas](https://gitgud.io/wackyideas/)' [AeroThemePlasma]
 VTP is in constant development and testing. So far it has been tested on:
 
 1. Arch Linux x64 and other Arch derivatives
-2. Plasma 6.7.5, KDE Frameworks 6.30.0, Qt 6.11.2
+2. Plasma 6.8.0, KDE Frameworks 6.30.0, Qt 6.11.2
 3. 96 DPI scaling, single monitor
 4. X11, Wayland*
 

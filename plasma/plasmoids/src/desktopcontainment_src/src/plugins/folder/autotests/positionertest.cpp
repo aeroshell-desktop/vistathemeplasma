@@ -19,7 +19,7 @@
 QTEST_MAIN(PositionerTest)
 
 static const QLatin1String desktop(QLatin1String("Desktop"));
-static const QLatin1String defaultResolution(QLatin1String("1920x1080"));
+static constexpr QSize defaultResolution(1920, 1080);
 
 void PositionerTest::initTestCase()
 {
@@ -47,13 +47,15 @@ void PositionerTest::cleanupTestCase()
 
 void PositionerTest::init()
 {
+    m_applet->config().deleteGroup(QStringLiteral("General"));
+
     m_folderModel = new FolderModel(this);
     m_folderModel->classBegin();
     m_folderModel->setScreen(0);
     m_folderModel->setUsedByContainment(true);
     m_folderModel->componentComplete();
+    m_folderModel->setScreenResolution(defaultResolution);
     m_positioner = new Positioner(this);
-    m_positioner->m_resolution = defaultResolution;
     m_positioner->setApplet(m_applet);
     m_positioner->setEnabled(true);
     m_positioner->setFolderModel(m_folderModel);
@@ -86,7 +88,8 @@ void PositionerTest::tst_default_positions()
     QVERIFY(m_positioner->screenInUse());
     // Since we are not using configs, make sure our positions is clean before test
     m_positioner->reset();
-    m_positioner->m_positions = QStringList();
+    m_positioner->m_positionsHeader.reset();
+    m_positioner->m_positions.clear();
     m_positioner->m_perStripe = perStripe;
     m_positioner->convertFolderModelData();
     m_positioner->updateResolution();
@@ -130,7 +133,7 @@ void PositionerTest::tst_move()
     if (configChanged) {
         QCOMPARE_NE(baselineConfig, getCurrentConfig());
     } else {
-        // If our movement doesnt change anything, config is equal
+        // If our movement doesn't change anything, config is equal
         QCOMPARE(baselineConfig, getCurrentConfig());
     }
 }
@@ -206,6 +209,9 @@ void PositionerTest::tst_changePerStripe()
     Positioner positioner;
     QCOMPARE(positioner.perStripe(), 0);
     QSignalSpy s(&positioner, &Positioner::perStripeChanged);
+    positioner.setPerStripe(1);
+    QCOMPARE(s.count(), 0); // No change without foldermodel, since foldermodel holds screen information
+    positioner.setFolderModel(m_folderModel);
     positioner.setPerStripe(1);
     QCOMPARE(s.count(), 1);
 
@@ -341,9 +347,12 @@ void PositionerTest::tst_changeResolution()
     m_positioner->loadAndApplyPositionsConfig();
     auto baselineConfig = getCurrentConfig();
 
-    changeResolution(QStringLiteral("800x600"));
-    // Configuration should not be saved after resolution change, so its identical to baseline
-    QCOMPARE(baselineConfig, getCurrentConfig());
+    constexpr QSize newResolution(800, 600);
+    changeResolution(newResolution);
+    QCOMPARE(m_positioner->m_resolution, QStringLiteral("%1x%2").arg(newResolution.width()).arg(newResolution.height()));
+
+    // Configuration is saved after resolution change (icon layout is converted to a new resolution)
+    QCOMPARE_NE(baselineConfig, getCurrentConfig());
 }
 
 void PositionerTest::tst_renameFile()
@@ -434,8 +443,8 @@ void PositionerTest::checkDefaultPositions(int perStripe)
 {
     ensureFolderModelReady();
     QCOMPARE(perStripe, m_positioner->perStripe());
-    QCOMPARE(m_positioner->positions()[0].toInt(), 1 + ((m_positioner->rowCount() - 1) / perStripe)); // rows
-    QCOMPARE(m_positioner->positions()[1].toInt(), perStripe); // columns
+    QCOMPARE(m_positioner->positions().at(0).toInt(), 1 + ((m_positioner->rowCount() - 1) / perStripe)); // rows
+    QCOMPARE(m_positioner->positions().at(1).toInt(), perStripe); // columns
     const auto currentPositions = getPositionHash(m_positioner->positions());
     // Checking default positions ignores configuration completely
     // instead, it compares that the default values match, since the
@@ -469,12 +478,10 @@ void PositionerTest::ensureFolderModelReady()
     }
 }
 
-void PositionerTest::changeResolution(QString resolution)
+void PositionerTest::changeResolution(const QSize &resolution)
 {
-    // Identical to updateResolution, except we input the resolution manually
-    // instead of reading a screen
-    m_positioner->m_resolution = resolution;
-    m_positioner->loadAndApplyPositionsConfig();
+    m_folderModel->setScreenResolution(resolution);
+    m_positioner->setPerStripe(m_positioner->m_perStripe);
 }
 
 #include "moc_positionertest.cpp"

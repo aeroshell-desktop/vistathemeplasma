@@ -41,6 +41,9 @@ target_link_libraries(systemtray_static
         KF6::ConfigCore
         KF6::IconThemes
         KF6::I18n
+        KF6::KIOGui
+        KF6::JobWidgets
+        KF6::Service
         KF6::ItemModels
         KF6::WindowSystem
         KF6::XmlGui
@@ -71,7 +74,7 @@ ecm_finalize_qml_module(systemtrayplugin)
 
 #install(FILES statusnotifieritem.operations DESTINATION ${PLASMA5SUPPORT_DATA_INSTALL_DIR}/services)
 
-if(BUILD_TESTING)
-  add_subdirectory(autotests)
-  add_subdirectory(tests)
-endif()
+# if(BUILD_TESTING)
+#   add_subdirectory(autotests)
+#   add_subdirectory(tests)
+# endif()

@@ -24,6 +24,7 @@ public:
     Q_INVOKABLE QRect availableScreenRectForItem(QQuickItem *item) const;
 
     QPoint popupPosition(QQuickItem *item, const QSize &size) override;
+
     bool allowClosing() const;
     void setAllowClosing(bool allow);
 

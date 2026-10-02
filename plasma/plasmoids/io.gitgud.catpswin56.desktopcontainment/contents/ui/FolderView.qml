@@ -1402,7 +1402,6 @@ FocusScope {
                 : (gridView.height / gridView.cellHeight))
 
             Component.onCompleted: {
-                positioner.updateResolution();
                 positioner.loadAndApplyPositionsConfig();
             }
 

@@ -39,6 +39,73 @@
 
 using namespace Qt::StringLiterals;
 
+static void showSystemTrayMenuWayland(QMenu *menu, QQuickItem *trayItem, Plasma::Types::Location location)
+{
+    QWindow *trayWindow = trayItem->window();
+    if (!trayWindow) {
+        qCWarning(SYSTEM_TRAY) << menu << "has no parent window, this should never happen";
+        return;
+    }
+
+    menu->winId();
+    QWindow *menuWindow = menu->windowHandle();
+
+    const QRect anchorRect = trayItem->mapRectToScene(QRectF(QPoint(0, 0), trayItem->size())).toRect();
+
+    Qt::Edges anchor;
+    Qt::Edges gravity;
+    switch (location) {
+    case Plasma::Types::Location::TopEdge:
+        anchor = Qt::BottomEdge;
+        gravity = Qt::BottomEdge;
+
+        if (qGuiApp->isLeftToRight()) {
+            anchor |= Qt::LeftEdge;
+            gravity |= Qt::RightEdge;
+        } else {
+            anchor |= Qt::RightEdge;
+            gravity |= Qt::LeftEdge;
+        }
+        break;
+
+    case Plasma::Types::Location::BottomEdge:
+        anchor = Qt::TopEdge;
+        gravity = Qt::TopEdge;
+
+        if (qGuiApp->isLeftToRight()) {
+            anchor |= Qt::LeftEdge;
+            gravity |= Qt::RightEdge;
+        } else {
+            anchor |= Qt::RightEdge;
+            gravity |= Qt::LeftEdge;
+        }
+        break;
+
+    case Plasma::Types::Location::LeftEdge:
+        anchor = Qt::RightEdge | Qt::TopEdge;
+        gravity = Qt::RightEdge | Qt::BottomEdge;
+        break;
+
+    case Plasma::Types::Location::RightEdge:
+        anchor = Qt::LeftEdge | Qt::TopEdge;
+        gravity = Qt::LeftEdge | Qt::BottomEdge;
+        break;
+
+    default:
+        anchor = Qt::LeftEdge | Qt::BottomEdge;
+        gravity = Qt::RightEdge | Qt::BottomEdge;
+        break;
+    }
+
+    menuWindow->setTransientParent(trayWindow);
+
+    menuWindow->setProperty("_q_waylandPopupAnchorRect", anchorRect);
+    menuWindow->setProperty("_q_waylandPopupAnchor", QVariant::fromValue(anchor));
+    menuWindow->setProperty("_q_waylandPopupGravity", QVariant::fromValue(gravity));
+
+    menu->popup(trayWindow->screen()->geometry().topLeft());
+}
+
 SystemTray::SystemTray(QObject *parent, const KPluginMetaData &data, const QVariantList &args)
     : Plasma::Containment(parent, data, args)
 {
@@ -92,6 +159,15 @@ void SystemTray::initSettingsAndRegistry()
         m_plasmoidRegistry = new PlasmoidRegistry(m_settings, this);
         connect(m_plasmoidRegistry, &PlasmoidRegistry::plasmoidEnabled, this, &SystemTray::startApplet);
         connect(m_plasmoidRegistry, &PlasmoidRegistry::plasmoidStopped, this, &SystemTray::stopApplet);
+        connect(m_plasmoidRegistry, &PlasmoidRegistry::plasmoidDisabled, this, &SystemTray::stopApplet);
+    }
+}
+
+void SystemTray::initRegistry()
+{
+    if (m_plasmoidRegistry && !m_registryInitialized) {
+        m_plasmoidRegistry->init();
+        m_registryInitialized = true;
     }
 }
 
@@ -136,7 +212,6 @@ void SystemTray::migrateFromSystrayContainer()
     }
 
     // Delete the the old systray
-    bool oldSystrayInstantiated = false;
     for (Plasma::Containment *cont : corona()->containments()) {
         if (cont->id() == oldSystrayId) {
             delete cont;
@@ -179,7 +254,7 @@ void SystemTray::restoreContents(KConfigGroup &group)
     }
 
     initSettingsAndRegistry();
-    m_plasmoidRegistry->init();
+    initRegistry();
 }
 
 void SystemTray::showPlasmoidMenu(QQuickItem *appletInterface, int x, int y)
@@ -199,6 +274,10 @@ void SystemTray::showPlasmoidMenu(QQuickItem *appletInterface, int x, int y)
     }
 
     auto *desktopMenu = new QMenu;
+    // Breeze and Oxygen have rounded corners on menus. They set this attribute
+    // in polish() but at that time the underlying surface has already been
+    // created so setting this flag makes no difference anymore (Bug 385311)
+    desktopMenu->setAttribute(Qt::WA_TranslucentBackground);
     connect(this, &QObject::destroyed, desktopMenu, &QMenu::close);
     desktopMenu->setAttribute(Qt::WA_DeleteOnClose);
 
@@ -236,19 +315,9 @@ void SystemTray::showPlasmoidMenu(QQuickItem *appletInterface, int x, int y)
         return;
     }
 
-    desktopMenu->adjustSize();
-
-    if (QScreen *screen = appletInterface->window()->screen()) {
-        const QRect geo = screen->availableGeometry();
-
-        pos = QPoint(qBound(geo.left(), (int)pos.x(), geo.right() - desktopMenu->width()), //
-                     qBound(geo.top(), (int)pos.y(), geo.bottom() - desktopMenu->height()));
-    }
-
     KAcceleratorManager::manage(desktopMenu);
-    desktopMenu->winId();
-    desktopMenu->windowHandle()->setTransientParent(appletInterface->window());
-    desktopMenu->popup(pos.toPoint());
+
+    showSystemTrayMenuWayland(desktopMenu, appletInterface, location());
 }
 
 QPointF SystemTray::popupPosition(QQuickItem *visualParent, int x, int y)
@@ -262,20 +331,6 @@ QPointF SystemTray::popupPosition(QQuickItem *visualParent, int x, int y)
     QQuickWindow *const window = visualParent->window();
     if (window && window->screen()) {
         pos = window->mapToGlobal(pos.toPoint());
-#if HAVE_X11
-        if (KWindowSystem::isPlatformX11()) {
-            const auto devicePixelRatio = window->screen()->devicePixelRatio();
-            if (QGuiApplication::screens().size() == 1) {
-                return pos * devicePixelRatio;
-            }
-
-            const QRect geometry = window->screen()->geometry();
-            const QRect nativeGeometry = window->screen()->handle()->geometry();
-            const QPointF nativeGlobalPosOnCurrentScreen = (pos - geometry.topLeft()) * devicePixelRatio;
-
-            return nativeGeometry.topLeft() + nativeGlobalPosOnCurrentScreen;
-        }
-#endif
 
         if (KWindowSystem::isPlatformWayland()) {
             if (!m_xwaylandClientsScale) {
@@ -310,11 +365,20 @@ bool SystemTray::isSystemTrayApplet(const QString &appletId)
 SystemTrayModel *SystemTray::systemTrayModel()
 {
     if (!m_systemTrayModel) {
+        // Ensure settings and registry are initialized before creating the model.
+        // This can be called from QML property binding before init() completes.
+        initSettingsAndRegistry();
+
         m_systemTrayModel = new SystemTrayModel(this);
 
         m_plasmoidModel = new PlasmoidModel(m_settings, m_plasmoidRegistry, m_systemTrayModel);
         connect(this, &SystemTray::appletAdded, m_plasmoidModel, &PlasmoidModel::addApplet);
         connect(this, &SystemTray::appletRemoved, m_plasmoidModel, &PlasmoidModel::removeApplet);
+
+        // Initialize registry after model is created so signals are properly connected
+        initRegistry();
+
+        // Add any applets that already exist
         for (auto applet : applets()) {
             m_plasmoidModel->addApplet(applet);
         }
@@ -323,6 +387,7 @@ SystemTrayModel *SystemTray::systemTrayModel()
 
         m_systemTrayModel->addSourceModel(m_plasmoidModel);
         m_systemTrayModel->addSourceModel(m_statusNotifierModel);
+        m_systemTrayModel->addSourceModel(new BackgroundAppsFilteredModel(new BackgroundAppsModel(m_settings, m_systemTrayModel), m_systemTrayModel));
     }
 
     return m_systemTrayModel;
@@ -391,7 +456,7 @@ void SystemTray::startApplet(const QString &pluginId)
 
     // known one, recycle the id to reuse old config
     if (m_configGroupIds.contains(pluginId)) {
-        Applet *applet = Plasma::PluginLoader::self()->loadApplet(pluginId, m_configGroupIds.value(pluginId), QVariantList());
+        auto applet = Plasma::PluginLoader::self()->loadApplet(pluginId, m_configGroupIds.value(pluginId), QVariantList());
         // this should never happen unless explicitly wrong config is hand-written or
         //(more likely) a previously added applet is uninstalled
         if (!applet) {
@@ -399,10 +464,10 @@ void SystemTray::startApplet(const QString &pluginId)
             return;
         }
         applet->setProperty("org.kde.plasma:force-create", true);
-        addApplet(applet);
+        addApplet(std::move(applet));
         // create a new one automatic id, new config group
     } else {
-        Applet *applet = createApplet(pluginId, QVariantList() << u"org.kde.plasma:force-create"_s);
+        auto applet = createApplet(pluginId, QVariantList() << u"org.kde.plasma:force-create"_s);
         if (applet) {
             m_configGroupIds[pluginId] = applet->id();
         }
@@ -439,6 +504,11 @@ void SystemTray::activate(const QString &service, QPoint pos, QQuickItem *status
 {
     const auto source = StatusNotifierItemHost::self()->itemForService(service);
 
+    if (!source) {
+        qCWarning(SYSTEM_TRAY) << "activate: Could not find item for service" << service;
+        return;
+    }
+
     connect(
         source,
         &StatusNotifierItemSource::activateResult,
@@ -453,13 +523,9 @@ void SystemTray::activate(const QString &service, QPoint pos, QQuickItem *status
         Qt::SingleShotConnection);
 
     QWindow *window = nullptr;
-    if (KWindowSystem::isPlatformX11()) {
-        source->activate(pos.x(), pos.y());
-        return;
-    }
 
     auto tokenFuture = KWaylandExtras::xdgActivationToken(window, {});
-    tokenFuture.then(this, [source, service, pos](const QString &token) {
+    tokenFuture.then(source, [source, service, pos](const QString &token) {
         source->provideXdgActivationToken(token);
         source->activate(pos.x(), pos.y());
     });
@@ -469,14 +535,15 @@ void SystemTray::secondaryActivate(const QString &service, QPoint pos)
 {
     const auto source = StatusNotifierItemHost::self()->itemForService(service);
 
-    QWindow *window = nullptr;
-    if (KWindowSystem::isPlatformX11()) {
-        source->secondaryActivate(pos.x(), pos.y());
+    if (!source) {
+        qCWarning(SYSTEM_TRAY) << "secondaryActivate: Could not find item for service" << service;
         return;
     }
 
+    QWindow *window = nullptr;
+
     auto tokenFuture = KWaylandExtras::xdgActivationToken(window, {});
-    tokenFuture.then(this, [source, pos](const QString &token) {
+    tokenFuture.then(source, [source, pos](const QString &token) {
         source->provideXdgActivationToken(token);
         source->secondaryActivate(pos.x(), pos.y());
     });
@@ -486,71 +553,27 @@ void SystemTray::openContextMenu(const QString &service, QPoint pos, QQuickItem 
 {
     const auto source = StatusNotifierItemHost::self()->itemForService(service);
 
+    if (!source) {
+        qCWarning(SYSTEM_TRAY) << "openContextMenu: Could not find item for service" << service;
+        return;
+    }
+
     connect(
         source,
         &StatusNotifierItemSource::contextMenuReady,
         this,
-        [this, statusNotifierIcon, pos](QMenu *menu) {
-            if (menu && !menu->isEmpty()) {
-                menu->adjustSize();
-                int x = pos.x();
-                int y = pos.y();
-
-                // try tofind the icon screen coordinates, and adjust the position as a poor
-                // man's popupPosition
-
-                QRect screenItemRect(statusNotifierIcon->mapToScene(QPointF(0, 0)).toPoint(), QSize(statusNotifierIcon->width(), statusNotifierIcon->height()));
-
-                if (statusNotifierIcon->window()) {
-                    screenItemRect.moveTopLeft(statusNotifierIcon->window()->mapToGlobal(screenItemRect.topLeft()));
-                }
-
-                switch (location()) {
-                    case Plasma::Types::LeftEdge:
-                        x = screenItemRect.right();
-                        y = screenItemRect.top();
-                        break;
-                    case Plasma::Types::RightEdge:
-                        x = screenItemRect.left() - menu->width();
-                        y = screenItemRect.top();
-                        break;
-                    case Plasma::Types::TopEdge:
-                        x = screenItemRect.left();
-                        y = screenItemRect.bottom();
-                        break;
-                    case Plasma::Types::BottomEdge:
-                        x = screenItemRect.left();
-                        y = screenItemRect.top() - menu->height();
-                        break;
-                    default:
-                        x = screenItemRect.left();
-                        if (screenItemRect.top() - menu->height() >= statusNotifierIcon->window()->screen()->geometry().top()) {
-                            y = screenItemRect.top() - menu->height();
-                        } else {
-                            y = screenItemRect.bottom();
-                        }
-                }
-
+        [this, statusNotifierIcon = QPointer<QQuickItem>{statusNotifierIcon}](QMenu *menu) {
+            if (statusNotifierIcon && menu && !menu->isEmpty()) {
                 KAcceleratorManager::manage(menu);
-                menu->winId();
-                menu->windowHandle()->setTransientParent(statusNotifierIcon->window());
-                menu->popup(QPoint(x, y));
-                // Workaround for QTBUG-59044
-                if (auto item = statusNotifierIcon->window()->mouseGrabberItem()) {
-                    item->ungrabMouse();
-                }
+                showSystemTrayMenuWayland(menu, statusNotifierIcon, location());
             }
         },
         Qt::SingleShotConnection);
 
     QWindow *window = nullptr;
-    if (KWindowSystem::isPlatformX11()) {
-        source->contextMenu(pos.x(), pos.y());
-        return;
-    }
 
     auto tokenFuture = KWaylandExtras::xdgActivationToken(window, {});
-    tokenFuture.then(this, [source, pos](const QString &token) {
+    tokenFuture.then(source, [source, pos](const QString &token) {
         source->provideXdgActivationToken(token);
         source->contextMenu(pos.x(), pos.y());
     });
@@ -559,10 +582,16 @@ void SystemTray::openContextMenu(const QString &service, QPoint pos, QQuickItem 
 void SystemTray::scroll(const QString &service, int delta, const QString &direction)
 {
     const auto source = StatusNotifierItemHost::self()->itemForService(service);
+
+    if (!source) {
+        qCWarning(SYSTEM_TRAY) << "scroll: Could not find item for service" << service;
+        return;
+    }
+
     source->scroll(delta, direction);
 }
 
-K_PLUGIN_CLASS(SystemTray)
+K_PLUGIN_CLASS_WITH_JSON(SystemTray, "metadata.json")
 
 #include "systemtray.moc"
 

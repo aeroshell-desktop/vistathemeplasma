@@ -18,33 +18,33 @@ ViewPropertiesMenu::ViewPropertiesMenu(QObject *parent)
 {
     m_menu = new QMenu();
 
-    m_sortMenu = new QMenu(i18n("Sort By"));
+    QMenu *menu = m_menu->addMenu(QIcon::fromTheme(QStringLiteral("view-sort")), i18n("Sort By"));
     m_sortMode = new QActionGroup(this);
     connect(m_sortMode, &QActionGroup::triggered, this, &ViewPropertiesMenu::sortModeChanged);
-    QAction *action = m_sortMenu->addAction(i18nc("@item:inmenu Sort icons manually", "Unsorted"));
+    QAction *action = menu->addAction(i18nc("@item:inmenu Sort icons manually", "Unsorted"));
     action->setCheckable(true);
     action->setData(-1);
     m_sortMode->addAction(action);
-    action = m_sortMenu->addAction(i18nc("@item:inmenu Sort icons by name", "Name"));
+    action = menu->addAction(i18nc("@item:inmenu Sort icons by name", "Name"));
     action->setCheckable(true);
     action->setData(int(KDirModel::Name));
     m_sortMode->addAction(action);
-    action = m_sortMenu->addAction(i18nc("@item:inmenu Sort icons by size", "Size"));
+    action = menu->addAction(i18nc("@item:inmenu Sort icons by size", "Size"));
     action->setCheckable(true);
     action->setData(int(KDirModel::Size));
     m_sortMode->addAction(action);
-    action = m_sortMenu->addAction(i18nc("@item:inmenu Sort icons by file type", "Type"));
+    action = menu->addAction(i18nc("@item:inmenu Sort icons by file type", "Type"));
     action->setCheckable(true);
     action->setData(int(KDirModel::Type));
     m_sortMode->addAction(action);
-    action = m_sortMenu->addAction(i18nc("@item:inmenu Sort icons by date", "Date"));
+    action = menu->addAction(i18nc("@item:inmenu Sort icons by date", "Date"));
     action->setCheckable(true);
     action->setData(int(KDirModel::ModifiedTime));
     m_sortMode->addAction(action);
-    m_sortMenu->addSeparator();
-    m_sortDesc = m_sortMenu->addAction(i18nc("@item:inmenu Sort icons in descending order", "Descending"), this, &ViewPropertiesMenu::sortDescChanged);
+    menu->addSeparator();
+    m_sortDesc = menu->addAction(i18nc("@item:inmenu Sort icons in descending order", "Descending"), this, &ViewPropertiesMenu::sortDescChanged);
     m_sortDesc->setCheckable(true);
-    m_sortDirsFirst = m_sortMenu->addAction(i18nc("@item:inmenu Sort icons with folders first", "Folders First"), this, &ViewPropertiesMenu::sortDirsFirstChanged);
+    m_sortDirsFirst = menu->addAction(i18nc("@item:inmenu Sort icons with folders first", "Folders First"), this, &ViewPropertiesMenu::sortDirsFirstChanged);
     m_sortDirsFirst->setCheckable(true);
 
     m_iconSizeMenu = m_menu->addMenu(QIcon::fromTheme(QStringLiteral("transform-scale")), i18n("Icon Size"));
@@ -67,25 +67,26 @@ ViewPropertiesMenu::ViewPropertiesMenu(QObject *parent)
     m_arrangementMenu = m_menu->addMenu(QIcon::fromTheme(QStringLiteral("object-rows")), i18nc("@item:inmenu arrangement of icons", "Arrange"));
     m_arrangement = new QActionGroup(this);
     connect(m_arrangement, &QActionGroup::triggered, this, &ViewPropertiesMenu::arrangementChanged);
-    const auto isLtR = qApp->layoutDirection() == Qt::LeftToRight;
-    action = m_arrangementMenu->addAction(isLtR ? i18nc("@item:inmenu arrangement of icons", "Left to Right")
-                                                : i18nc("@item:inmenu arrangement of icons", "Right to Left"));
+    action = m_arrangementMenu->addAction(i18nc("@item:inmenu arrangement of icons", "In Rows"));
     action->setCheckable(true);
     action->setData(0);
     m_arrangement->addAction(action);
-    action = m_arrangementMenu->addAction(i18nc("@item:inmenu arrangement of icons", "Top to Bottom"));
+    action = m_arrangementMenu->addAction(i18nc("@item:inmenu arrangement of icons", "In Columns"));
     action->setData(1);
     action->setCheckable(true);
     m_arrangement->addAction(action);
 
-    m_alignmentMenu = m_menu->addMenu(QIcon::fromTheme(QStringLiteral("align-horizontal-left")), i18n("Align"));
+    m_alignmentMenu = m_menu->addMenu(QIcon::fromTheme(QStringLiteral("align-horizontal-left")), i18n("Sort Alignment"));
     m_alignment = new QActionGroup(this);
     connect(m_alignment, &QActionGroup::triggered, this, &ViewPropertiesMenu::alignmentChanged);
-    action = m_alignmentMenu->addAction(i18nc("@item:inmenu alignment of icons", "Left"));
+    const auto isLtR = qApp->layoutDirection() == Qt::LeftToRight;
+    auto LtRText = i18nc("@item:inmenu alignment of icons", "Left-to-Right");
+    auto RtLText = i18nc("@item:inmenu alignment of icons", "Right-to-Left");
+    action = m_alignmentMenu->addAction(isLtR ? LtRText : RtLText);
     action->setCheckable(true);
     action->setData(0);
     m_alignment->addAction(action);
-    action = m_alignmentMenu->addAction(i18nc("@item:inmenu alignment of icons", "Right"));
+    action = m_alignmentMenu->addAction(isLtR ? RtLText : LtRText);
     action->setCheckable(true);
     action->setData(1);
     m_alignment->addAction(action);
@@ -103,16 +104,11 @@ ViewPropertiesMenu::ViewPropertiesMenu(QObject *parent)
 ViewPropertiesMenu::~ViewPropertiesMenu()
 {
     delete m_menu;
-    delete m_sortMenu;
 }
 
-QObject *ViewPropertiesMenu::menu() const
+QMenu *ViewPropertiesMenu::menu() const
 {
     return m_menu;
-}
-QObject *ViewPropertiesMenu::sortMenu() const
-{
-    return m_sortMenu;
 }
 
 bool ViewPropertiesMenu::showLayoutActions() const

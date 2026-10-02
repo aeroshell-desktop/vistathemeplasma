@@ -11,6 +11,8 @@
 #include <QStringList>
 
 #include "dbusproperties.h"
+
+#include "debug.h"
 #include <iostream>
 
 using namespace Qt::StringLiterals;
@@ -32,9 +34,7 @@ StatusNotifierItemHost::StatusNotifierItemHost()
     init();
 }
 
-StatusNotifierItemHost::~StatusNotifierItemHost()
-{
-}
+StatusNotifierItemHost::~StatusNotifierItemHost() = default;
 
 StatusNotifierItemHost *StatusNotifierItemHost::self()
 {
@@ -57,8 +57,7 @@ void StatusNotifierItemHost::init()
         m_serviceName = u"org.kde.StatusNotifierHost-" + QString::number(QCoreApplication::applicationPid());
         QDBusConnection::sessionBus().registerService(m_serviceName);
 
-        QDBusServiceWatcher *watcher =
-            new QDBusServiceWatcher(s_watcherServiceName, QDBusConnection::sessionBus(), QDBusServiceWatcher::WatchForOwnerChange, this);
+        auto *watcher = new QDBusServiceWatcher(s_watcherServiceName, QDBusConnection::sessionBus(), QDBusServiceWatcher::WatchForOwnerChange, this);
         connect(watcher, &QDBusServiceWatcher::serviceOwnerChanged, this, &StatusNotifierItemHost::serviceChange);
 
         registerWatcher(s_watcherServiceName);
@@ -67,7 +66,7 @@ void StatusNotifierItemHost::init()
 
 void StatusNotifierItemHost::serviceChange(const QString &name, const QString &oldOwner, const QString &newOwner)
 {
-    qDebug() << "Service" << name << "status change, old owner:" << oldOwner << "new:" << newOwner;
+    qCDebug(SYSTEM_TRAY) << "Service" << name << "status change, old owner:" << oldOwner << "new:" << newOwner;
 
     if (newOwner.isEmpty()) {
         // unregistered
@@ -103,7 +102,7 @@ void StatusNotifierItemHost::registerWatcher(const QString &service)
 
             QDBusPendingReply<QDBusVariant> pendingItems = propetriesIface.Get(m_statusNotifierWatcher->interface(), u"RegisteredStatusNotifierItems"_s);
 
-            QDBusPendingCallWatcher *watcher = new QDBusPendingCallWatcher(pendingItems, this);
+            auto *watcher = new QDBusPendingCallWatcher(pendingItems, this);
             connect(watcher, &QDBusPendingCallWatcher::finished, this, [=, this]() {
                 watcher->deleteLater();
                 QDBusReply<QDBusVariant> reply = *watcher;
@@ -115,9 +114,8 @@ void StatusNotifierItemHost::registerWatcher(const QString &service)
                 }
             });
         } else {
-            delete m_statusNotifierWatcher;
-            m_statusNotifierWatcher = nullptr;
-            qDebug() << "System tray daemon not reachable";
+            delete std::exchange(m_statusNotifierWatcher, nullptr);
+            qCDebug(SYSTEM_TRAY) << "System tray daemon not reachable";
         }
     }
 }
@@ -125,7 +123,7 @@ void StatusNotifierItemHost::registerWatcher(const QString &service)
 void StatusNotifierItemHost::unregisterWatcher(const QString &service)
 {
     if (service == s_watcherServiceName) {
-        qDebug() << s_watcherServiceName << "disappeared";
+        qCDebug(SYSTEM_TRAY) << s_watcherServiceName << "disappeared";
 
         disconnect(m_statusNotifierWatcher,
                    &OrgKdeStatusNotifierWatcherInterface::StatusNotifierItemRegistered,
@@ -138,14 +136,13 @@ void StatusNotifierItemHost::unregisterWatcher(const QString &service)
 
         removeAllSNIServices();
 
-        delete m_statusNotifierWatcher;
-        m_statusNotifierWatcher = nullptr;
+        delete std::exchange(m_statusNotifierWatcher, nullptr);
     }
 }
 
 void StatusNotifierItemHost::serviceRegistered(const QString &service)
 {
-    qDebug() << "Registering" << service;
+    qCDebug(SYSTEM_TRAY) << "Registering" << service;
     addSNIService(service);
 }
 
@@ -170,7 +167,7 @@ void StatusNotifierItemHost::removeAllSNIServices()
 
 void StatusNotifierItemHost::addSNIService(const QString &service)
 {
-    StatusNotifierItemSource *item = new StatusNotifierItemSource(service, this);
+    auto *item = new StatusNotifierItemSource(service, this);
     m_sniServices.insert(service, item);
     Q_EMIT itemAdded(service);
 }

@@ -9,6 +9,7 @@
 */
 
 #include "foldermodel.h"
+#include "debug.h"
 #include "desktopschemehelper.h"
 #include "itemviewadapter.h"
 #include "positioner.h"
@@ -18,20 +19,26 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QCollator>
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
+#include <QDBusServiceWatcher>
 #include <QDir>
 #include <QDrag>
 #include <QImage>
 #include <QItemSelectionModel>
+#include <QJSEngine>
 #include <QLoggingCategory>
 #include <QMenu>
 #include <QMimeData>
 #include <QMimeDatabase>
 #include <QPainter>
 #include <QPixmap>
+#include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QScreen>
 #include <QStack>
+#include <QStandardPaths>
 #include <QTimer>
 #include <qplatformdefs.h>
 
@@ -59,6 +66,10 @@
 #include <KIO/PreviewJob>
 #include <KIO/RestoreJob>
 #include <KIO/StatJob>
+#include <kio_version.h>
+#if KIO_VERSION >= QT_VERSION_CHECK(6, 31, 0)
+#include <KIO/RenameFileWarningDialog>
+#endif
 #include <KLocalizedString>
 #include <KNotification>
 #include <KNotificationJobUiDelegate>
@@ -75,13 +86,44 @@
 #include <PlasmaActivities/Consumer>
 
 #include <chrono>
+#include <qqmlintegration.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 using namespace std::chrono_literals;
 
-Q_LOGGING_CATEGORY(FOLDERMODEL, "plasma.containments.desktop.folder.foldermodel")
+KRunnerChecker::KRunnerChecker(QObject *parent)
+    : QObject(parent)
+    , m_krunnerAvailable(false)
+{
+    const QString serviceName = QStringLiteral("org.kde.krunner");
+    const QString serviceFile = QStringLiteral("dbus-1/services/org.kde.krunner.service");
+
+    bool isRunning = QDBusConnection::sessionBus().interface()->isServiceRegistered(serviceName);
+    bool isInstalled = !QStandardPaths::locate(QStandardPaths::GenericDataLocation, serviceFile).isEmpty();
+
+    m_krunnerAvailable = isRunning || isInstalled;
+
+    auto watcher = new QDBusServiceWatcher(serviceName, QDBusConnection::sessionBus(), QDBusServiceWatcher::WatchForOwnerChange, this);
+    connect(watcher,
+            &QDBusServiceWatcher::serviceOwnerChanged,
+            this,
+            [this, serviceFile](const QString & /*name*/, const QString & /*oldOwner*/, const QString &newOwner) {
+                bool currentlyActive = !newOwner.isEmpty();
+                bool stillAvailable = currentlyActive;
+
+                // Fallback: If it stopped running, check if the service file still exists
+                if (!stillAvailable) {
+                    stillAvailable = !QStandardPaths::locate(QStandardPaths::GenericDataLocation, serviceFile).isEmpty();
+                }
+
+                if (stillAvailable != m_krunnerAvailable) {
+                    m_krunnerAvailable = stillAvailable;
+                    Q_EMIT krunnerAvailableChanged();
+                }
+            });
+}
 
 class DragTrackerSingleton
 {
@@ -159,6 +201,7 @@ FolderModel::FolderModel(QObject *parent)
     , m_actionCollection(this)
     , m_newMenu(nullptr)
     , m_fileItemActions(nullptr)
+    , m_copyToMenu(nullptr)
     , m_usedByContainment(false)
     , m_locked(true)
     , m_sortMode(0)
@@ -199,13 +242,6 @@ FolderModel::FolderModel(QObject *parent)
     m_dirModel->setDropsAllowed(KDirModel::DropOnDirectory | KDirModel::DropOnLocalExecutable);
     m_dirModel->dirLister()->setAutoUpdate(true);
 
-    // If we have dropped items queued for moving, go unsorted now.
-    connect(this, &QAbstractItemModel::rowsAboutToBeInserted, this, [this]() {
-        if (!m_dropTargetPositions.isEmpty()) {
-            setSortMode(-1);
-        }
-    });
-
     /*
      * Dropped files may not actually show up as new files, e.g. when we overwrite
      * an existing file. Or files that fail to be listed by the dirLister, or...
@@ -220,7 +256,7 @@ FolderModel::FolderModel(QObject *parent)
     m_dropTargetPositionsCleanup->setSingleShot(true);
     connect(m_dropTargetPositionsCleanup, &QTimer::timeout, this, [this]() {
         if (!m_dropTargetPositions.isEmpty()) {
-            qCDebug(FOLDERMODEL) << "clearing drop target positions after timeout:" << m_dropTargetPositions;
+            qCDebug(FOLDER) << "clearing drop target positions after timeout:" << m_dropTargetPositions;
             m_dropTargetPositions.clear();
         }
     });
@@ -228,11 +264,17 @@ FolderModel::FolderModel(QObject *parent)
     m_selectionModel = new QItemSelectionModel(this, this);
     connect(m_selectionModel, &QItemSelectionModel::selectionChanged, this, &FolderModel::changeSelection);
     connect(m_selectionModel, &QItemSelectionModel::selectionChanged, this, &FolderModel::selectionChanged);
+    connect(m_selectionModel, &QItemSelectionModel::selectionChanged, this, &FolderModel::selectionCountChanged);
 
     setSourceModel(m_dirModel);
 
     connect(this, &QAbstractItemModel::rowsInserted, this, [this](const QModelIndex &parent, int first, int last) {
         for (int i = first; i <= last; ++i) {
+            // If screen is not used, we should just clear the positions and return.
+            if (!screenUsed()) {
+                m_dropTargetPositions.clear();
+                return;
+            }
             const auto idx = index(i, 0, parent);
             const auto url = itemForIndex(idx).url();
             auto it = m_dropTargetPositions.find(url.fileName());
@@ -299,6 +341,8 @@ QHash<int, QByteArray> FolderModel::staticRoleNames()
 QPoint FolderModel::localMenuPosition() const
 {
     QScreen *screen = nullptr;
+    auto position = m_menuPosition;
+
     for (auto *s : qApp->screens()) {
         if (s->geometry().contains(m_menuPosition)) {
             screen = s;
@@ -306,9 +350,13 @@ QPoint FolderModel::localMenuPosition() const
         }
     }
     if (screen) {
-        return m_menuPosition - screen->geometry().topLeft();
+        position -= screen->geometry().topLeft();
     }
-    return m_menuPosition;
+
+    if (m_applet && m_applet->containment()) {
+        return position - m_applet->containment()->availableRelativeScreenRect().toAlignedRect().topLeft();
+    }
+    return position;
 }
 
 void FolderModel::classBegin()
@@ -339,6 +387,12 @@ void FolderModel::invalidateFilterIfComplete()
     invalidateFilter();
 }
 
+void FolderModel::newFileMenuItemCreationStarted(const QUrl &url)
+{
+    Q_UNUSED(url);
+    setCreatingNewItems(true);
+}
+
 void FolderModel::newFileMenuItemCreated(const QUrl &url)
 {
     if (m_usedByContainment && !m_screenMapper->sharedDesktops()) {
@@ -349,17 +403,23 @@ void FolderModel::newFileMenuItemCreated(const QUrl &url)
     }
     setCreatingNewItems(false);
 }
+
 void FolderModel::newFileMenuItemRejected(const QUrl &url)
 {
     Q_UNUSED(url);
     setCreatingNewItems(false);
 }
-void FolderModel::newFileMenuItemCreationStarted(const QUrl &url)
-{
-    Q_UNUSED(url);
-    setCreatingNewItems(true);
-}
 
+void FolderModel::setUnsortedModeOnDrop()
+{
+    // The positioner will override old icon layout by
+    // sorted icon layout after drag and drop operation.
+    if (m_sortMode != -1) {
+        m_unsortedModeOnDrop = true;
+        setSortMode(-1);
+        m_unsortedModeOnDrop = false;
+    }
+}
 
 QString FolderModel::url() const
 {
@@ -418,19 +478,6 @@ void FolderModel::setUrl(const QString &url)
 QUrl FolderModel::resolvedUrl() const
 {
     return m_dirModel->dirLister()->url();
-}
-
-bool FolderModel::creatingNewItems() const
-{
-    return m_creatingNewItems;
-}
-
-void FolderModel::setCreatingNewItems(bool enabled)
-{
-    if (m_creatingNewItems != enabled) {
-        m_creatingNewItems = enabled;
-        Q_EMIT creatingNewItemsChanged();
-    }
 }
 
 QUrl FolderModel::resolve(const QString &url)
@@ -498,8 +545,8 @@ void FolderModel::setUsedByContainment(bool used)
         QAction *action = m_actionCollection.action(QStringLiteral("refresh"));
 
         if (action) {
-            action->setText(i18n("Refresh"));
-            action->setIcon(QIcon());
+            action->setText(m_usedByContainment ? i18n("&Refresh Desktop") : i18n("&Refresh View"));
+            action->setIcon(m_usedByContainment ? QIcon::fromTheme(QStringLiteral("user-desktop")) : QIcon::fromTheme(QStringLiteral("view-refresh")));
         }
 
         m_screenMapper->disconnect(this);
@@ -699,7 +746,7 @@ void FolderModel::setFilterPattern(const QString &pattern)
     }
 
     m_filterPattern = pattern;
-    m_filterPatternMatchAll = (pattern == QLatin1String("*"));
+    m_filterPatternMatchAll = (pattern == QLatin1String("*") || pattern.isEmpty());
 
     const QList<QStringView> patterns = QStringView(pattern).split(QLatin1Char(' '));
     m_regExps.clear();
@@ -731,14 +778,18 @@ void FolderModel::setFilterMimeTypes(const QStringList &mimeList)
     }
 }
 
-void FolderModel::setScreen(int screen)
+void FolderModel::setScreen(int screen, SetScreenActions screenActions)
 {
     bool screenUsed = (screen != -1);
 
     if (screenUsed && m_screen != screen) {
+        const int prevScreen = m_screen;
         m_screen = screen;
         if (m_usedByContainment && !m_screenMapper->sharedDesktops()) {
             m_screenMapper->addScreen(screen, m_currentActivity, resolvedUrl());
+            if (screenActions == SetScreenActions::MoveIcons && prevScreen > -1 && screen > -1) {
+                m_screenMapper->addScreenTransition(prevScreen, screen, m_currentActivity);
+            }
         }
     }
     m_screenUsed = screenUsed;
@@ -876,23 +927,73 @@ void FolderModel::rename(int row, const QString &name)
         return;
     }
 
-    QModelIndex idx = index(row, 0);
+    const QModelIndex idx = index(row, 0);
+    if (!idx.isValid()) {
+        return;
+    }
+
+    const KFileItem oldItem = itemForIndex(idx);
+    if (name.isEmpty() || name == oldItem.text() || name == QLatin1Char('.') || name == QLatin1String("..")) {
+        return;
+    }
+
+    const QUrl oldUrl = oldItem.url();
+    const QString oldName = oldItem.name();
     const QString filename = data(idx, UrlRole).toString();
-    Q_EMIT itemAboutToRename(filename);
-    m_dirModel->setData(mapToSource(idx), name, Qt::EditRole);
+    const QString newFilename = QStringLiteral("desktop:/%1").arg(name);
+
+#if KIO_VERSION >= QT_VERSION_CHECK(6, 31, 0)
+    auto *renameWarning = new KIO::RenameFileWarningDialog(oldItem, name, nullptr, showHiddenFiles());
+    connect(renameWarning, &KIO::RenameFileWarningDialog::result, this, [this, oldUrl, oldName, filename, newFilename, name](bool proceed) {
+        if (!proceed) {
+            return;
+        }
+        if (!renameTargetStillMatches(oldUrl, oldName)) {
+            return;
+        }
+        const int targetRow = indexForUrl(oldUrl);
+        if (targetRow < 0) {
+            return;
+        }
+        connect(
+            this,
+            &QAbstractItemModel::dataChanged,
+            this,
+            [=, this](const QModelIndex &topLeft, const QModelIndex &bottomRight, const QList<int> &roles) {
+                Q_UNUSED(roles);
+                Q_UNUSED(topLeft);
+                Q_UNUSED(bottomRight);
+                Q_EMIT itemRenamed(filename, newFilename);
+            },
+            Qt::SingleShotConnection);
+        setData(index(targetRow, 0), name, Qt::EditRole);
+    });
+    renameWarning->exec();
+#else
     connect(
-        m_dirModel,
-        &KDirModel::dataChanged,
+        this,
+        &QAbstractItemModel::dataChanged,
         this,
         [=, this](const QModelIndex &topLeft, const QModelIndex &bottomRight, const QList<int> &roles) {
-            Q_UNUSED(roles)
-            QString newFilename;
-            if (topLeft == bottomRight) {
-                newFilename = data(mapFromSource(topLeft), UrlRole).toString();
-            }
+            Q_UNUSED(roles);
+            Q_UNUSED(topLeft);
+            Q_UNUSED(bottomRight);
             Q_EMIT itemRenamed(filename, newFilename);
         },
         Qt::SingleShotConnection);
+    setData(idx, name, Qt::EditRole);
+#endif
+}
+
+bool FolderModel::renameTargetStillMatches(const QUrl &oldUrl, const QString &expectedName) const
+{
+    const int row = indexForUrl(oldUrl);
+    if (row < 0) {
+        return false;
+    }
+
+    const KFileItem item = itemForIndex(index(row, 0));
+    return item.name() == expectedName;
 }
 
 int FolderModel::fileExtensionBoundary(int row)
@@ -925,6 +1026,11 @@ int FolderModel::fileExtensionBoundary(int row)
 bool FolderModel::hasSelection() const
 {
     return m_selectionModel->hasSelection();
+}
+
+int FolderModel::selectionCount() const
+{
+    return m_selectionModel->selectedIndexes().count();
 }
 
 bool FolderModel::isSelected(int row)
@@ -1159,6 +1265,8 @@ void FolderModel::dragSelectedInternal(int x, int y)
     DragTracker::self()->setDragInProgress(nullptr, false);
     m_urlChangedWhileDragging = false;
 
+    // If we spring-load into another folder and back (with the back button or draggin outside a popup)
+    // the first condition will be true, but we don't want to do this with an empty dragIndexes
     if (m_dirModel->dirLister()->url() == currentUrl && !m_dragIndexes.isEmpty()) {
         const QModelIndex first(m_dragIndexes.first());
         const QModelIndex last(m_dragIndexes.last());
@@ -1166,6 +1274,9 @@ void FolderModel::dragSelectedInternal(int x, int y)
         // TODO: Optimize to Q_EMIT contiguous groups.
         Q_EMIT dataChanged(first, last, {BlankRole});
     }
+    // After drag is done, we should clear the dropTargetPositions or they will be
+    // reused during rowsInserted
+    m_dropTargetPositions.clear();
 }
 
 static bool isDropBetweenSharedViews(const QList<QUrl> &urls, const QUrl &folderUrl)
@@ -1219,10 +1330,9 @@ void FolderModel::drop(QQuickItem *target, QObject *dropEvent, int row, bool sho
         dropTargetUrl = item.mostLocalUrl();
     }
 
-    auto dropTargetFolderUrl = dropTargetUrl;
-    if (dropTargetFolderUrl.fileName() == QLatin1Char('.')) {
+    if (dropTargetUrl.fileName() == QLatin1Char('.')) {
         // the target URL for desktop:/ is e.g. 'file://home/user/Desktop/.'
-        dropTargetFolderUrl = dropTargetFolderUrl.adjusted(QUrl::RemoveFilename);
+        dropTargetUrl = dropTargetUrl.adjusted(QUrl::RemoveFilename | QUrl::StripTrailingSlash);
     }
 
     // use dropTargetUrl to resolve desktop:/ to the actual file location which is also used by the mime data
@@ -1230,15 +1340,16 @@ void FolderModel::drop(QQuickItem *target, QObject *dropEvent, int row, bool sho
      * use a fancy scheme like desktop:/ instead. Ensure we always use the latter to properly map URLs,
      * i.e. go from file:///home/user/Desktop/file to desktop:/file
      */
-    auto mappableUrl = [this, dropTargetFolderUrl](const QUrl &url) -> QUrl {
-        if (dropTargetFolderUrl != m_dirModel->dirLister()->url()) {
+    auto mappableUrl = [this, dropTargetUrl](const QUrl &url) -> QUrl {
+        if (dropTargetUrl != m_dirModel->dirLister()->url()) {
             QString mappedUrl = url.toString();
-            const auto local = dropTargetFolderUrl.toString();
-            const auto internal = m_dirModel->dirLister()->url().toString();
+            const auto local = dropTargetUrl.toString();
+            auto internal = m_dirModel->dirLister()->url();
             if (mappedUrl.startsWith(local)) {
-                mappedUrl.replace(0, local.size(), internal);
+                mappedUrl.replace(0, local.size(), QString());
             }
-            return ScreenMapper::stringToUrl(mappedUrl);
+            internal.setPath(mappedUrl);
+            return ScreenMapper::stringToUrl(internal.toString());
         }
         return url;
     };
@@ -1253,7 +1364,6 @@ void FolderModel::drop(QQuickItem *target, QObject *dropEvent, int row, bool sho
         }
 
         setUnsortedModeOnDrop();
-        //setSortMode(-1);
 
         for (const auto &url : mimeData->urls()) {
             m_dropTargetPositions.insert(url.fileName(), dropPos);
@@ -1276,9 +1386,8 @@ void FolderModel::drop(QQuickItem *target, QObject *dropEvent, int row, bool sho
     }
 
     if (m_usedByContainment && !m_screenMapper->sharedDesktops()) {
-        if (isDropBetweenSharedViews(mimeData->urls(), dropTargetFolderUrl)) {
+        if (isDropBetweenSharedViews(mimeData->urls(), dropTargetUrl)) {
             setUnsortedModeOnDrop();
-            //setSortMode(-1);
             const QList<QUrl> urls = mimeData->urls();
             for (const auto &url : urls) {
                 m_dropTargetPositions.insert(url.fileName(), dropPos);
@@ -1412,7 +1521,10 @@ void FolderModel::changeSelection(const QItemSelection &selected, const QItemSel
 
 bool FolderModel::isBlank(int row) const
 {
-    if (row < 0) {
+    // Invalid indexes are blank, since they're not created yet
+    // and will be created when needed.
+    const auto idx = index(row, 0);
+    if (row < 0 || !idx.isValid()) {
         return true;
     }
 
@@ -1466,22 +1578,6 @@ QVariant FolderModel::data(const QModelIndex &index, int role) const
     }
 
     return QSortFilterProxyModel::data(index, role);
-}
-
-void FolderModel::setUnsortedModeOnDrop()
-{
-    // The positioner will override old icon layout by
-    // sorted icon layout after drag and drop operation.
-    if (m_sortMode != -1) {
-        m_unsortedModeOnDrop = true;
-        setSortMode(-1);
-        m_unsortedModeOnDrop = false;
-    }
-}
-
-bool FolderModel::unsortedModeOnDrop()
-{
-    return m_unsortedModeOnDrop;
 }
 
 int FolderModel::indexForUrl(const QUrl &url) const
@@ -1703,6 +1799,7 @@ bool FolderModel::filterAcceptsRow(int sourceRow, const QModelIndex &sourceParen
             // time we see it or the folderview was previously used as a regular applet.
             // Associated with this folderview if the view is on the first available screen
             if (m_screen == m_screenMapper->firstAvailableScreen(resolvedUrl(), m_currentActivity)) {
+                m_screenMapper->maybeMoveToDisabledScreens(url, m_currentActivity);
                 m_screenMapper->addMapping(url, m_screen, m_currentActivity, ScreenMapper::DelayedSignal);
             } else {
                 return false;
@@ -1742,17 +1839,17 @@ void FolderModel::createActions()
 
     QAction *refresh = new QAction(QIcon::fromTheme(QStringLiteral("view-refresh")), i18n("&Refresh View"), this);
     refresh->setShortcut(QKeySequence(QKeySequence::Refresh));
-    connect(refresh, &QAction::triggered, this, [refresh, this]() { this->refresh(true); });
+    connect(refresh, &QAction::triggered, this, &FolderModel::refresh);
 
     QAction *rename = KStandardAction::renameFile(this, &FolderModel::requestRename, this);
     QAction *trash = KStandardAction::moveToTrash(this, &FolderModel::moveSelectedToTrash, this);
     QAction *del = KStandardAction::deleteFile(this, &FolderModel::deleteSelected, this);
     RemoveAction *remove = new RemoveAction(&m_actionCollection, this);
 
-    QAction *emptyTrash = new QAction(QIcon::fromTheme(QStringLiteral("trash-empty")), i18n("&Empty Trash"), this);
+    QAction *emptyTrash = new QAction(QIcon::fromTheme(QStringLiteral("edit-delete")), i18n("&Empty Trash"), this);
     connect(emptyTrash, &QAction::triggered, this, &FolderModel::emptyTrashBin);
 
-    QAction *restoreFromTrash = new QAction(i18nc("Restore from trash", "Restore"), this);
+    QAction *restoreFromTrash = new QAction(QIcon::fromTheme(QStringLiteral("edit-reset")), i18nc("Restore from trash", "Restore to Former Location"), this);
     connect(restoreFromTrash, &QAction::triggered, this, &FolderModel::restoreSelectedFromTrash);
 
     QAction *actOpen = new QAction(QIcon::fromTheme(QStringLiteral("window-new")), i18n("&Open"), this);
@@ -1854,11 +1951,18 @@ void FolderModel::updateActions()
         if (QAction *newMenuAction = m_actionCollection.action(QStringLiteral("newMenu"))) {
             newMenuAction->setEnabled(itemProperties.supportsWriting());
             newMenuAction->setVisible(!isTrash);
-            newMenuAction->setText(i18n("New"));
-            newMenuAction->setIcon(QIcon());
         }
     }
 
+    if (QAction *moveToTrash = m_actionCollection.action(QStringLiteral("trash"))) {
+        if (isTrashLink) {
+            moveToTrash->setIcon(QIcon::fromTheme(QStringLiteral("edit-delete-remove")));
+            moveToTrash->setText(i18nc("@action:inmenu Removes the trash icon on the desktop", "Remove Trash Icon"));
+        } else {
+            moveToTrash->setIcon(QIcon::fromTheme(QStringLiteral("trash-empty")));
+            moveToTrash->setText(i18n("&Move to Trash"));
+        }
+    }
     if (QAction *emptyTrash = m_actionCollection.action(QStringLiteral("emptyTrash"))) {
         if (isTrash || isTrashLink) {
             emptyTrash->setVisible(true);
@@ -1878,7 +1982,6 @@ void FolderModel::updateActions()
 
     if (QAction *cut = m_actionCollection.action(QStringLiteral("cut"))) {
         cut->setEnabled(itemProperties.supportsDeleting());
-        cut->setVisible(!isTrash);
     }
 
     if (QAction *paste = m_actionCollection.action(QStringLiteral("paste"))) {
@@ -1887,21 +1990,17 @@ void FolderModel::updateActions()
         const QString pasteText = KIO::pasteActionText(QApplication::clipboard()->mimeData(), &enable, rootItem());
 
         if (enable) {
-            //paste->setText(pasteText);
-            paste->setText(i18n("&Paste"));
+            paste->setText(pasteText);
             paste->setEnabled(true);
         } else {
             paste->setText(i18n("&Paste"));
             paste->setEnabled(false);
         }
-        paste->setIcon(QIcon());
 
         if (QAction *pasteTo = m_actionCollection.action(QStringLiteral("pasteto"))) {
             pasteTo->setVisible(itemProperties.isDirectory() && itemProperties.supportsWriting());
             pasteTo->setEnabled(paste->isEnabled());
-            //pasteTo->setText(paste->text());
-            pasteTo->setText(i18n("&Paste"));
-            pasteTo->setIcon(QIcon());
+            pasteTo->setText(paste->text());
         }
     }
 
@@ -1943,6 +2042,8 @@ void FolderModel::openContextMenu(QQuickItem *visualParent, Qt::KeyboardModifier
     } else {
         KFileItemList items;
         QList<QUrl> urls;
+        bool isTrashLink = false;
+        const bool isTrash = (resolvedUrl().scheme() == QLatin1String("trash"));
 
         items.reserve(indexes.count());
         urls.reserve(indexes.count());
@@ -1955,11 +2056,27 @@ void FolderModel::openContextMenu(QQuickItem *visualParent, Qt::KeyboardModifier
         }
 
         KFileItemListProperties itemProperties(items);
+        // Check if we're showing the menu for the trash link
+        if (items.count() == 1 && items.at(0).isDesktopFile()) {
+            KDesktopFile file(items.at(0).localPath());
+            if (file.hasLinkType() && file.readUrl() == QLatin1String("trash:/")) {
+                isTrashLink = true;
+            }
+        }
 
         // Start adding the actions:
         // "Open" and "Open with" actions
-        m_fileItemActions->setItemListProperties(itemProperties);
-        m_fileItemActions->insertOpenWithActionsTo(nullptr, menu, QStringList());
+        if (!isTrash && !isTrashLink) {
+            m_fileItemActions->setItemListProperties(itemProperties);
+            m_fileItemActions->insertOpenWithActionsTo(nullptr, menu, QStringList());
+        }
+
+        if (!isTrash) {
+            menu->addAction(m_actionCollection.action(QStringLiteral("emptyTrash")));
+        } else {
+            menu->addAction(m_actionCollection.action(QStringLiteral("restoreFromTrash")));
+        }
+
         menu->addSeparator();
 
         // Add "Show Target" action only if the file *has* a target
@@ -1969,8 +2086,11 @@ void FolderModel::openContextMenu(QQuickItem *visualParent, Qt::KeyboardModifier
             menu->addSeparator();
         }
 
-        menu->addAction(m_actionCollection.action(QStringLiteral("cut")));
-        menu->addAction(m_actionCollection.action(QStringLiteral("copy")));
+        if (!isTrashLink) {
+            menu->addAction(m_actionCollection.action(QStringLiteral("cut")));
+            menu->addAction(m_actionCollection.action(QStringLiteral("copy")));
+        }
+
         if (urls.length() == 1) {
             if (items.first().isDir()) {
                 menu->addAction(m_actionCollection.action(QStringLiteral("pasteto")));
@@ -1980,39 +2100,45 @@ void FolderModel::openContextMenu(QQuickItem *visualParent, Qt::KeyboardModifier
         }
 
         menu->addAction(m_actionCollection.action(QStringLiteral("rename")));
-        menu->addSeparator();
-        menu->addAction(m_actionCollection.action(QStringLiteral("restoreFromTrash")));
+
+        if (!isTrashLink) {
+            menu->addSeparator();
+        }
 
         if (isDeleteCommandShown()) {
-            QAction *trashAction = m_actionCollection.action(QStringLiteral("trash"));
+            if (!isTrash) {
+                QAction *trashAction = m_actionCollection.action(QStringLiteral("trash"));
+                menu->addAction(trashAction);
+            }
             QAction *deleteAction = m_actionCollection.action(QStringLiteral("del"));
-            menu->addAction(trashAction);
             menu->addAction(deleteAction);
         } else {
-            if (RemoveAction *removeAction = qobject_cast<RemoveAction *>(m_actionCollection.action(QStringLiteral("remove")))) {
-                removeAction->update();
-                menu->addAction(removeAction);
+            if (!isTrash) {
+                if (RemoveAction *removeAction = qobject_cast<RemoveAction *>(m_actionCollection.action(QStringLiteral("remove")))) {
+                    removeAction->update();
+                    menu->addAction(removeAction);
 
-                // Used to monitor Shift modifier usage while the menu is open, to
-                // swap the Trash and Delete actions.
-                menu->installEventFilter(removeAction);
-                QCoreApplication::instance()->installEventFilter(removeAction);
+                    // Used to monitor Shift modifier usage while the menu is open, to
+                    // swap the Trash and Delete actions.
+                    menu->installEventFilter(removeAction);
+                    QCoreApplication::instance()->installEventFilter(removeAction);
+                }
             }
         }
 
-        menu->addAction(m_actionCollection.action(QStringLiteral("emptyTrash")));
-
         menu->addSeparator();
 
-        m_fileItemActions->addActionsTo(menu);
+        if (!isTrash && !isTrashLink) {
+            m_fileItemActions->addActionsTo(menu);
 
-        // Copy To, Move To
-        KSharedConfig::Ptr dolphin = KSharedConfig::openConfig(QStringLiteral("dolphinrc"));
-        if (KConfigGroup(dolphin, QStringLiteral("General")).readEntry("ShowCopyMoveMenu", false)) {
-            m_copyToMenu->setUrls(urls);
-            m_copyToMenu->setReadOnly(!itemProperties.supportsMoving());
-            m_copyToMenu->addActionsTo(menu);
-            menu->addSeparator();
+            // Copy To, Move To
+            KSharedConfig::Ptr dolphin = KSharedConfig::openConfig(QStringLiteral("dolphinrc"));
+            if (KConfigGroup(dolphin, QStringLiteral("General")).readEntry("ShowCopyMoveMenu", false)) {
+                m_copyToMenu->setUrls(urls);
+                m_copyToMenu->setReadOnly(!itemProperties.supportsMoving());
+                m_copyToMenu->addActionsTo(menu);
+                menu->addSeparator();
+            }
         }
 
         // Properties
@@ -2141,11 +2267,10 @@ void FolderModel::pasteTo()
     KIO::paste(QApplication::clipboard()->mimeData(), urls.first());
 }
 
-void FolderModel::refresh(bool isExplicit)
+void FolderModel::refresh()
 {
     m_errorString.clear();
     Q_EMIT errorStringChanged();
-    Q_EMIT hasRefreshed(isExplicit);
 
     m_dirModel->dirLister()->updateDirectory(m_dirModel->dirLister()->url());
 }
@@ -2182,7 +2307,9 @@ void FolderModel::setApplet(Plasma::Applet *applet)
                     m_screenMapper->setCorona(corona);
                 }
                 setScreen(containment->screen());
-                connect(containment, &Plasma::Containment::screenChanged, this, &FolderModel::setScreen);
+                connect(containment, &Plasma::Containment::screenChanged, this, [this](int newScreen) {
+                    setScreen(newScreen, SetScreenActions::MoveIcons);
+                });
                 connect(containment, &Plasma::Containment::screenGeometryChanged, this, &FolderModel::screenGeometryChanged);
             }
         }
@@ -2191,8 +2318,20 @@ void FolderModel::setApplet(Plasma::Applet *applet)
     }
 }
 
+#ifdef BUILD_TESTING
+void FolderModel::setScreenResolution(const QSizeF &size)
+{
+    m_screenResolution = size;
+}
+#endif
+
 QRectF FolderModel::screenGeometry()
 {
+#ifdef BUILD_TESTING
+    if (m_screenResolution.isValid()) {
+        return QRectF(QPointF(), m_screenResolution);
+    }
+#endif
     if (m_applet) {
         Plasma::Containment *containment = m_applet->containment();
         if (containment) {
@@ -2200,6 +2339,24 @@ QRectF FolderModel::screenGeometry()
         }
     }
     return QRectF();
+}
+
+bool FolderModel::unsortedModeOnDrop()
+{
+    return m_unsortedModeOnDrop;
+}
+
+bool FolderModel::creatingNewItems() const
+{
+    return m_creatingNewItems;
+}
+
+void FolderModel::setCreatingNewItems(bool enabled)
+{
+    if (m_creatingNewItems != enabled) {
+        m_creatingNewItems = enabled;
+        Q_EMIT creatingNewItemsChanged();
+    }
 }
 
 bool FolderModel::showHiddenFiles() const
@@ -2240,6 +2397,7 @@ void FolderModel::moveSelectedToTrash()
 
     using Iface = KIO::AskUserActionInterface;
     auto *job = new KIO::DeleteOrTrashJob(selectedUrls(), Iface::Trash, Iface::DefaultConfirmation, this);
+    job->setUiDelegate(new KNotificationJobUiDelegate(KJobUiDelegate::AutoHandlingEnabled));
     job->start();
 }
 
@@ -2314,4 +2472,4 @@ bool FolderModel::isDeleteCommandShown()
     return cg.readEntry("ShowDeleteCommand", false);
 }
 
-#include "moc_foldermodel.cpp"
+#include "foldermodel.moc"

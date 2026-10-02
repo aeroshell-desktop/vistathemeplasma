@@ -17,6 +17,7 @@ class FolderModelTest : public QObject
     Q_OBJECT
 
 private Q_SLOTS:
+    void initTestCase();
     void init();
     void cleanup();
     void tst_listing();
@@ -33,6 +34,7 @@ private Q_SLOTS:
     void tst_lockedChanged();
     void tst_multiScreen();
     void tst_multiScreenDifferenPath();
+    void tst_initializeOnCorrectScreens();
 
 private:
     void createTestFolder(const QString &path);

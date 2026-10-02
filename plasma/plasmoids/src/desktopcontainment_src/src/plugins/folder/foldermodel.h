@@ -64,6 +64,29 @@ private:
     void handleJobError(KIO::Job *job);
 };
 
+// Small helper exposed to QML to check whether KRunner is installed/running.
+class KRunnerChecker : public QObject
+{
+    Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+    Q_PROPERTY(bool krunnerAvailable READ krunnerAvailable NOTIFY krunnerAvailableChanged)
+
+public:
+    explicit KRunnerChecker(QObject *parent = nullptr);
+
+    bool krunnerAvailable() const
+    {
+        return m_krunnerAvailable;
+    }
+
+Q_SIGNALS:
+    void krunnerAvailableChanged();
+
+private:
+    bool m_krunnerAvailable;
+};
+
 class FolderModel : public QSortFilterProxyModel, public QQmlParserStatus
 {
     Q_OBJECT
@@ -93,6 +116,7 @@ class FolderModel : public QSortFilterProxyModel, public QQmlParserStatus
     Q_PROPERTY(Plasma::Applet *applet READ applet WRITE setApplet NOTIFY appletChanged)
     Q_PROPERTY(bool showHiddenFiles READ showHiddenFiles WRITE setShowHiddenFiles NOTIFY showHiddenFilesChanged)
     Q_PROPERTY(bool creatingNewItems READ creatingNewItems NOTIFY creatingNewItemsChanged)
+    Q_PROPERTY(int selectionCount READ selectionCount NOTIFY selectionCountChanged)
 
 public:
     enum DataRole {
@@ -122,6 +146,11 @@ public:
         Canceled,
     };
     Q_ENUM(Status)
+
+    enum class SetScreenActions {
+        None,
+        MoveIcons
+    };
 
     explicit FolderModel(QObject *parent = nullptr);
     ~FolderModel() override;
@@ -205,6 +234,7 @@ public:
     Q_INVOKABLE int fileExtensionBoundary(int row);
 
     Q_INVOKABLE bool hasSelection() const;
+    Q_INVOKABLE int selectionCount() const;
     Q_INVOKABLE bool isSelected(int row);
     Q_INVOKABLE void setSelected(int row);
     Q_INVOKABLE void toggleSelected(int row);
@@ -246,13 +276,16 @@ public:
     Q_INVOKABLE void cut();
     Q_INVOKABLE void deleteSelected();
     Q_INVOKABLE void undo();
-    Q_INVOKABLE void refresh(bool isExplicit = false);
+    Q_INVOKABLE void refresh();
     Q_INVOKABLE void createFolder();
 
     bool screenUsed();
 
-    void setScreen(int screen);
+    void setScreen(int screen, SetScreenActions screenActions = SetScreenActions::None);
 
+#ifdef BUILD_TESTING
+    void setScreenResolution(const QSizeF &size);
+#endif
     QRectF screenGeometry();
 
     bool unsortedModeOnDrop();
@@ -286,12 +319,11 @@ Q_SIGNALS:
     void popupMenuAboutToShow(KIO::DropJob *dropJob, QMimeData *mimeData, int x, int y);
     void selectionChanged() const;
     void showHiddenFilesChanged() const;
-    void itemAboutToRename(const QString &filename) const;
     void itemRenamed(const QString &filename, const QString &newFilename) const;
     void screenGeometryChanged() const;
     void selectionDone();
     void creatingNewItemsChanged() const;
-    void hasRefreshed(bool isExplicit);
+    void selectionCountChanged() const;
 
 protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override;
@@ -331,6 +363,7 @@ private:
     void createActions();
     void addDragImage(QDrag *drag, int x, int y);
     void setStatus(Status status);
+    bool renameTargetStillMatches(const QUrl &oldUrl, const QString &expectedName) const;
     static bool isTrashEmpty();
     static bool isDeleteCommandShown();
     QList<QUrl> selectedUrls() const;
@@ -364,8 +397,6 @@ private:
     bool m_sortDirsFirst;
     bool m_parseDesktopFiles;
     bool m_previews;
-    bool m_unsortedModeOnDrop = false;
-    bool m_creatingNewItems = false;
     // An empty previewPlugin list means use default.
     // We don't want to leak that fact to the QML side, however, so the property stays empty
     // and internally we operate on effectivePreviewPlugins instead.
@@ -382,12 +413,18 @@ private:
     Plasma::Applet *m_applet = nullptr;
     bool m_complete;
     QPoint m_menuPosition;
+    bool m_creatingNewItems = false;
+    bool m_unsortedModeOnDrop = false;
 
     /**
      * This property is used to save the current activity when FolderModel is initialized.
      */
     QString m_currentActivity;
     bool m_showHiddenFiles;
+
+#ifdef BUILD_TESTING
+    QSizeF m_screenResolution;
+#endif
 };
 
 class DragTracker : public QObject

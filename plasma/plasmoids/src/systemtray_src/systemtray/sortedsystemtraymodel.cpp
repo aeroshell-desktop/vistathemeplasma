@@ -5,6 +5,7 @@
 */
 
 #include "sortedsystemtraymodel.h"
+#include "debug.h"
 #include "systemtraymodel.h"
 
 #include <QList>

@@ -10,7 +10,7 @@
 #include <QDebug>
 #include <kservice.h>
 
-#include <qcommandlineparser.h>
+#include <QCommandLineParser>
 
 #include <KLocalizedString>
 #include <KStatusNotifierItem>
@@ -116,8 +116,7 @@ void StatusNotifierTest::updateNotifier()
 {
     // log("update");
     if (!enabledCheck->isChecked()) {
-        delete d->systemNotifier;
-        d->systemNotifier = nullptr;
+        delete std::exchange(d->systemNotifier, nullptr);
         return;
     } else {
         if (!d->systemNotifier) {

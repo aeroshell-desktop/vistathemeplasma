@@ -6,6 +6,7 @@
 */
 
 #include "plasmoidregistry.h"
+#include "debug.h"
 
 #include "dbusserviceobserver.h"
 #include "systemtraysettings.h"
@@ -82,7 +83,7 @@ void PlasmoidRegistry::onEnabledPluginsChanged(const QStringList &enabledPlugins
 
 void PlasmoidRegistry::packageInstalled(const QString &pluginId)
 {
-    qDebug() << "New package installed" << pluginId;
+    qCDebug(SYSTEM_TRAY) << "New package installed" << pluginId;
 
     if (m_systrayApplets.contains(pluginId)) {
         if (m_settings->isEnabledPlugin(pluginId) && !m_dbusObserver->isDBusActivable(pluginId)) {
@@ -102,7 +103,7 @@ void PlasmoidRegistry::packageInstalled(const QString &pluginId)
 
 void PlasmoidRegistry::packageUninstalled(const QString &pluginId)
 {
-    qDebug() << "Package uninstalled" << pluginId;
+    qCDebug(SYSTEM_TRAY) << "Package uninstalled" << pluginId;
     if (m_systrayApplets.contains(pluginId)) {
         unregisterPlugin(pluginId);
     }

@@ -1,7 +1,7 @@
 #!/bin/bash
 CUR_DIR=${PWD}
 
-BRANCH_VERSION="Plasma/6.7"
+BRANCH_VERSION="Plasma/6.8"
 
 SU_CMD=sudo
 if [[ -z "$(command -v $SU_CMD)" ]]; then

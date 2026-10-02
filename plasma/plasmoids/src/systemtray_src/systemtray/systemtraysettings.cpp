@@ -6,6 +6,8 @@
 
 #include "systemtraysettings.h"
 
+#include "debug.h"
+
 #include <KConfigLoader>
 
 static const QString KNOWN_ITEMS_KEY = QStringLiteral("knownItems");

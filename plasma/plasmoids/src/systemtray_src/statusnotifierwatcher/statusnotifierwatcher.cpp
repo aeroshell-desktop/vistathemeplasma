@@ -13,6 +13,7 @@
 #include <kpluginfactory.h>
 
 #include "statusnotifieritem_interface.h"
+#include "statusnotifierwatcher_debug.h"
 #include "statusnotifierwatcheradaptor.h"
 
 K_PLUGIN_CLASS_WITH_JSON(StatusNotifierWatcher, "statusnotifierwatcher.json")
@@ -32,9 +33,7 @@ StatusNotifierWatcher::StatusNotifierWatcher(QObject *parent, const QList<QVaria
     connect(m_serviceWatcher, &QDBusServiceWatcher::serviceUnregistered, this, &StatusNotifierWatcher::serviceUnregistered);
 }
 
-StatusNotifierWatcher::~StatusNotifierWatcher()
-{
-}
+StatusNotifierWatcher::~StatusNotifierWatcher() = default;
 
 void StatusNotifierWatcher::RegisterStatusNotifierItem(const QString &serviceOrPath)
 {
@@ -56,7 +55,7 @@ void StatusNotifierWatcher::RegisterStatusNotifierItem(const QString &serviceOrP
         // check if the service has registered a SystemTray object
         org::kde::StatusNotifierItem trayclient(service, path, QDBusConnection::sessionBus());
         if (trayclient.isValid()) {
-            qDebug() << "Registering" << notifierItemId << "to system tray";
+            qCDebug(STATUSNOTIFIERITEMWATCHER) << "Registering" << notifierItemId << "to system tray";
             m_registeredServices.append(notifierItemId);
             Q_EMIT StatusNotifierItemRegistered(notifierItemId);
         } else {
@@ -74,7 +73,7 @@ QStringList StatusNotifierWatcher::RegisteredStatusNotifierItems() const
 
 void StatusNotifierWatcher::serviceUnregistered(const QString &name)
 {
-    qDebug() << "Service " << name << "unregistered";
+    qCDebug(STATUSNOTIFIERITEMWATCHER) << "Service " << name << "unregistered";
     m_serviceWatcher->removeWatchedService(name);
 
     const QString match = name + QLatin1Char('/');

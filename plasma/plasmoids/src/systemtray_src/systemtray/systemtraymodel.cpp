@@ -1,5 +1,6 @@
 /*
     SPDX-FileCopyrightText: 2020 Konrad Materka <materka@gmail.com>
+    SPDX-FileCopyrightText: 2025 David Redondo <kde@david-redondo.de>
 
     SPDX-License-Identifier: GPL-2.0-or-later
 */
@@ -12,12 +13,21 @@
 #include "statusnotifieritemsource.h"
 #include "systemtraysettings.h"
 
+#include "dbusproperties.h"
+
+#include <KIO/ApplicationLauncherJob>
+#include <KIO/CommandLauncherJob>
 #include <KLocalizedString>
+#include <KNotificationJobUiDelegate>
+#include <KService>
+#include <KWaylandExtras>
 #include <Plasma/Applet>
 #include <PlasmaQuick/AppletQuickItem>
 
 #include <QIcon>
 #include <QQuickItem>
+
+using namespace Qt::StringLiterals;
 
 BaseModel::BaseModel(QPointer<SystemTraySettings> settings, QObject *parent)
     : QAbstractListModel(parent)
@@ -68,7 +78,7 @@ Plasma::Types::ItemStatus BaseModel::calculateEffectiveStatus(bool canRender, Pl
 
     bool forcedShown = m_showAllItems || m_shownItems.contains(itemId);
     bool forcedHidden = m_hiddenItems.contains(itemId);
-    bool isDisabledSni = m_settings->isDisabledStatusNotifier(itemId);
+    bool isDisabledSni = m_settings && m_settings->isDisabledStatusNotifier(itemId);
 
     if (!forcedShown && (status == Plasma::Types::ItemStatus::HiddenStatus || isDisabledSni)) {
         return Plasma::Types::ItemStatus::HiddenStatus;
@@ -89,6 +99,8 @@ PlasmoidModel::PlasmoidModel(const QPointer<SystemTraySettings> &settings, const
     : BaseModel(settings, parent)
     , m_plasmoidRegistry(plasmoidRegistry)
 {
+    Q_ASSERT(m_plasmoidRegistry);
+
     connect(m_plasmoidRegistry, &PlasmoidRegistry::pluginRegistered, this, &PlasmoidModel::appendRow);
     connect(m_plasmoidRegistry, &PlasmoidRegistry::pluginUnregistered, this, &PlasmoidModel::removeRow);
 
@@ -207,6 +219,8 @@ void PlasmoidModel::removeApplet(Plasma::Applet *applet)
 
 void PlasmoidModel::appendRow(const KPluginMetaData &pluginMetaData)
 {
+    Q_ASSERT(pluginMetaData.isValid());
+
     int idx = rowCount();
     beginInsertRows(QModelIndex(), idx, idx);
 
@@ -270,15 +284,21 @@ static QVariant extractIcon(const QIcon &icon, const QVariant &defaultValue = QV
     }
 }
 
-static QString extractItemId(const StatusNotifierItemSource *sniData)
+static QString extractItemId(StatusNotifierItemSource *sniData)
 {
     const QString itemId = sniData->id();
     // Bug 378910: workaround for Dropbox not following the SNI specification
     if (itemId.startsWith(QLatin1String("dropbox-client-"))) {
         return QLatin1String("dropbox-client-PID");
-    } else {
-        return itemId;
     }
+    // Disambiguate Chromium/Electron apps that all share the same tray icon Id
+    if (itemId.startsWith(QLatin1String("chrome_status_icon_"))) {
+        const QString processName = sniData->processName();
+        if (!processName.isEmpty()) {
+            return itemId + QLatin1Char('@') + processName;
+        }
+    }
+    return itemId;
 }
 
 QVariant StatusNotifierModel::data(const QModelIndex &index, int role) const
@@ -329,7 +349,7 @@ QVariant StatusNotifierModel::data(const QModelIndex &index, int role) const
         case BaseRole::EffectiveStatus:
             return calculateEffectiveStatus(true, extractStatus(sniData), itemId);
         default:
-            return QVariant();
+            return {};
         }
     }
 
@@ -452,6 +472,220 @@ void StatusNotifierModel::init()
     for (const QStringList services = m_sniHost->services(); const QString &service : services) {
         addSource(service);
     }
+}
+
+BackgroundAppsModel::BackgroundAppsModel(QPointer<SystemTraySettings> settings, QObject *parent)
+    : BaseModel(settings, parent)
+{
+    auto monitor = new OrgFreedesktopDBusPropertiesInterface("org.freedesktop.background.Monitor"_L1,
+                                                             "/org/freedesktop/background/monitor"_L1,
+                                                             QDBusConnection::sessionBus(),
+                                                             this);
+    connect(monitor,
+            &OrgFreedesktopDBusPropertiesInterface::PropertiesChanged,
+            this,
+            [this, monitor](const QString &interface, const QVariantMap &changed, const QStringList &invalidated) {
+                if (interface != monitor->service()) {
+                    return;
+                }
+                if (auto property = changed.find("BackgroundApps"_L1); property != changed.cend()) {
+                    backgroundAppsChanged(qdbus_cast<QList<QVariantMap>>(property->value<QDBusArgument>()));
+                } else if (invalidated.contains("BackgroundApps"_L1)) {
+                    backgroundAppsChanged({});
+                }
+            });
+    auto pendingCall = monitor->Get(monitor->service(), "BackgroundApps"_L1);
+    connect(new QDBusPendingCallWatcher(pendingCall, this), &QDBusPendingCallWatcher::finished, this, [this](QDBusPendingCallWatcher *call) {
+        call->deleteLater();
+        QDBusPendingReply<QVariant> result = *call;
+        if (result.isValid()) {
+            backgroundAppsChanged(qdbus_cast<QList<QVariantMap>>(result.value().value<QDBusArgument>()));
+        }
+    });
+}
+
+void BackgroundAppsModel::backgroundAppsChanged(const QList<QVariantMap> &backgroundApps)
+{
+    beginResetModel();
+    m_backgroundApps.clear();
+    m_backgroundApps.reserve(backgroundApps.size());
+    for (const auto &entry : backgroundApps) {
+        const QString appId = entry.value("app_id"_L1).toString();
+        const QString instance = entry.value("instance"_L1).toString();
+        // Some apps are reported as two different background instances, merge them, apps that rely on
+        // background monitoring are single instance anyway otherwise there is no way to bring them back
+        if (auto it = std::ranges::find(m_backgroundApps, appId, &BackgroundApp::appId); it != m_backgroundApps.end()) {
+            it->flatpakInstances.append(instance);
+            continue;
+        }
+        auto service = KService::serviceByDesktopName(appId);
+        if (!service) {
+            service = new KService(appId, QString(), QString());
+        }
+        m_backgroundApps.push_back({.appId = appId, .message = entry.value("message"_L1).toString(), .flatpakInstances = {instance}, .service = service});
+    }
+    endResetModel();
+}
+
+void BackgroundAppsModel::openBackgroundApp(const QModelIndex &index)
+{
+    if (!checkIndex(index, CheckIndexOption::IndexIsValid)) {
+        return;
+    }
+    const auto &app = m_backgroundApps.at(index.row());
+    auto tokenFuture = KWaylandExtras::xdgActivationToken(nullptr, app.appId);
+    tokenFuture.then([service = app.service](const QString &token) {
+        auto job = new KIO::ApplicationLauncherJob(service);
+        job->setStartupId(token.toUtf8());
+        auto delegate = new KNotificationJobUiDelegate(KJobUiDelegate::AutoErrorHandlingEnabled);
+        job->setUiDelegate(delegate);
+        job->start();
+    });
+
+    // Remove it from the model immediately - if things didnt work it will appear on the next update
+    // Better the errorneous case is a bit weird than the normal one
+    beginRemoveRows(index.parent(), index.row(), index.row());
+    m_backgroundApps.removeAt(index.row());
+    endRemoveRows();
+}
+
+void BackgroundAppsModel::stopBackgroundApp(const QModelIndex &index)
+{
+    if (!checkIndex(index, CheckIndexOption::IndexIsValid)) {
+        return;
+    }
+    const auto &app = m_backgroundApps.at(index.row());
+
+    auto appIdToDBusPath = [](QString appId) {
+        return u'/' + appId.replace(u'.', u'/').replace(u'-', u'_');
+    };
+
+    // Some apps react to a quit action even if it's not in their desktop file
+    // Nicer than immediately killing them
+    auto message = QDBusMessage::createMethodCall(app.appId, appIdToDBusPath(app.appId), "org.freedesktop.Application"_L1, "quit"_L1);
+    message.setArguments({QList<QVariant>{}, QVariantMap{}});
+    auto watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(message));
+    connect(watcher, &QDBusPendingCallWatcher::finished, watcher, [instances = app.flatpakInstances](QDBusPendingCallWatcher *watcher) {
+        watcher->deleteLater();
+        if (watcher->isError()) {
+            qCInfo(SYSTEM_TRAY) << "Failed to terminate background app via dbus:" << watcher->error();
+            for (const auto &instance : std::as_const(instances)) {
+                auto job = new KIO::CommandLauncherJob("flatpak"_L1, {"kill"_L1, instance});
+                auto delegate = new KNotificationJobUiDelegate(KJobUiDelegate::AutoErrorHandlingEnabled);
+                job->setUiDelegate(delegate);
+                job->start();
+            }
+        }
+    });
+    // Remove it from the model immediately - if things didnt work it will appear on the next update
+    // Better the errorneous case is a bit weird than the normal one
+    beginRemoveRows(index.parent(), index.row(), index.row());
+    m_backgroundApps.removeAt(index.row());
+    endRemoveRows();
+}
+
+int BackgroundAppsModel::rowCount(const QModelIndex &parent) const
+{
+    if (parent.isValid()) {
+        return 0;
+    }
+    return m_backgroundApps.size();
+}
+
+QHash<int, QByteArray> BackgroundAppsModel::roleNames() const
+{
+    auto roles = BaseModel::roleNames();
+    roles.insert(static_cast<int>(Role::Name), "name"_ba);
+    roles.insert(static_cast<int>(Role::Message), "message"_ba);
+    roles.insert(static_cast<int>(Role::Icon), "icon"_ba);
+    return roles;
+}
+
+QVariant BackgroundAppsModel::data(const QModelIndex &index, int role) const
+{
+    if (!checkIndex(index, CheckIndexOption::IndexIsValid)) {
+        return QVariant();
+    }
+
+    const auto &app = m_backgroundApps[index.row()];
+    if (role <= Qt::UserRole) {
+        switch (role) {
+        case Qt::DisplayRole:
+            return app.service->name();
+        case Qt::DecorationRole: {
+            QIcon icon = QIcon::fromTheme(app.service->icon());
+            return icon.isNull() ? QVariant() : icon;
+        }
+        default:
+            return QVariant();
+        }
+    }
+
+    if (role <= static_cast<int>(BaseRole::LastBaseRole)) {
+        switch (static_cast<BaseRole>(role)) {
+        case BaseRole::ItemType:
+            return u"BackgroundApp"_s;
+        case BaseRole::ItemId:
+            return app.appId;
+        case BaseRole::CanRender:
+            return true;
+        case BaseRole::Category:
+            return u"ApplicationStatus"_s;
+        case BaseRole::Status:
+            return Plasma::Types::ItemStatus::ActiveStatus;
+        case BaseRole::EffectiveStatus:
+            return calculateEffectiveStatus(true, Plasma::Types::ItemStatus::ActiveStatus, app.appId);
+        default:
+            return QVariant();
+        }
+    }
+
+    switch (static_cast<Role>(role)) {
+    case Role::Name:
+        return app.service->name();
+    case Role::Icon:
+        return app.service->icon();
+    case Role::Message:
+        return app.message;
+    case Role::FlatpakInstances:
+        return app.flatpakInstances;
+    default:
+        return QVariant();
+    }
+}
+
+BackgroundAppsFilteredModel::BackgroundAppsFilteredModel(BackgroundAppsModel *sourceModel, QObject *parent)
+    : QSortFilterProxyModel(parent)
+{
+    connect(StatusNotifierItemHost::self(), &StatusNotifierItemHost::itemAdded, this, [this](const QString &item) {
+        if (auto instance = StatusNotifierItemHost::self()->itemForService(item)->flatpakInstance(); !instance.isEmpty()) {
+            beginFilterChange();
+            m_flatpaksWithSni.push_back({.flatpakInstance = instance, .sniId = item});
+            endFilterChange();
+        }
+    });
+    connect(StatusNotifierItemHost::self(), &StatusNotifierItemHost::itemRemoved, this, [this](const QString &item) {
+        if (auto it = std::ranges::find(m_flatpaksWithSni, item, &Info::sniId); it != m_flatpaksWithSni.end()) {
+            beginFilterChange();
+            m_flatpaksWithSni.erase(it);
+            endFilterChange();
+        }
+    });
+    const auto registeredSnis = StatusNotifierItemHost::self()->services();
+    for (const auto &service : registeredSnis) {
+        if (auto instance = StatusNotifierItemHost::self()->itemForService(service)->flatpakInstance(); !instance.isEmpty()) {
+            m_flatpaksWithSni.push_back({.flatpakInstance = instance, .sniId = service});
+        }
+    }
+    setSourceModel(sourceModel);
+}
+
+bool BackgroundAppsFilteredModel::filterAcceptsRow(int source_row, const QModelIndex &source_parent) const
+{
+    auto instances = sourceModel()->index(source_row, 0, source_parent).data(static_cast<int>(BackgroundAppsModel::Role::FlatpakInstances)).toStringList();
+    return std::ranges::none_of(m_flatpaksWithSni, [&instances](const Info &info) {
+        return instances.contains(info.flatpakInstance);
+    });
 }
 
 SystemTrayModel::SystemTrayModel(QObject *parent)

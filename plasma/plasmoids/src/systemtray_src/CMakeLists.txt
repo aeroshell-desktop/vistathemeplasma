@@ -77,6 +77,7 @@ find_package(KF6 REQUIRED COMPONENTS
     ItemModels
     StatusNotifierItem
     XmlGui
+    Service
 )
 
 if(Qt6Gui_VERSION VERSION_GREATER_EQUAL "6.10.0")

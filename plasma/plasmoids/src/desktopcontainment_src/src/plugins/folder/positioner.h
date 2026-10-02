@@ -1,9 +1,8 @@
 /*
- *    SPDX-FileCopyrightText: 2014 Eike Hein <hein@kde.org>
- *
- *    SPDX-License-Identifier: GPL-2.0-or-later
- */
+    SPDX-FileCopyrightText: 2014 Eike Hein <hein@kde.org>
 
+    SPDX-License-Identifier: GPL-2.0-or-later
+*/
 
 #pragma once
 
@@ -112,7 +111,7 @@ public:
 
     bool updateResolution();
 
-    #ifdef BUILD_TESTING
+#ifdef BUILD_TESTING
     QHash<int, int> proxyToSourceMapping() const
     {
         return m_proxyToSource;
@@ -121,7 +120,7 @@ public:
     {
         return m_sourceToProxy;
     }
-    #endif
+#endif
 
 Q_SIGNALS:
     void enabledChanged() const;
@@ -142,7 +141,6 @@ private Q_SLOTS:
     void sourceRowsMoved(const QModelIndex &sourceParent, int sourceStart, int sourceEnd, const QModelIndex &destinationParent, int destinationRow);
     void sourceRowsRemoved(const QModelIndex &parent, int first, int last);
     void sourceLayoutChanged(const QList<QPersistentModelIndex> &parents, QAbstractItemModel::LayoutChangeHint hint);
-    void onItemAboutToRename(const QString &filename);
     void onItemRenamed(const QString &filename, const QString &newFilename);
     void onListingCompleted();
 
@@ -190,8 +188,6 @@ private:
     QString m_resolution;
 
     Plasma::Applet *m_applet = nullptr;
-
-    std::optional<QPair<QString, GridPosition>> m_toRename;
 
     friend class PositionerTest;
 };

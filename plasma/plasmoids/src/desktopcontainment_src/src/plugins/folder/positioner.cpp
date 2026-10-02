@@ -1,9 +1,8 @@
 /*
- *    SPDX-FileCopyrightText: 2014 Eike Hein <hein@kde.org>
- *
- *    SPDX-License-Identifier: GPL-2.0-or-later
- */
+    SPDX-FileCopyrightText: 2014 Eike Hein <hein@kde.org>
 
+    SPDX-License-Identifier: GPL-2.0-or-later
+*/
 
 #include "positioner.h"
 #include "foldermodel.h"
@@ -20,25 +19,25 @@ using namespace Qt::StringLiterals;
 
 namespace PositionsConstants
 {
-    // Stripes and items per stripe
-    constexpr qsizetype headerSize = 2;
+// Stripes and items per stripe
+constexpr qsizetype headerSize = 2;
 
-    // filename, stripe, pos
-    constexpr qsizetype bucketSize = 3;
+// filename, stripe, pos
+constexpr qsizetype bucketSize = 3;
 
-    // Offsets in bucket
-    constexpr qsizetype filenameOffset = 0;
-    constexpr qsizetype stripeOffset = 1;
-    constexpr qsizetype posOffset = 2;
+// Offsets in bucket
+constexpr qsizetype filenameOffset = 0;
+constexpr qsizetype stripeOffset = 1;
+constexpr qsizetype posOffset = 2;
 }
 
 Positioner::Positioner(QObject *parent)
-: QAbstractItemModel(parent)
-, m_enabled(false)
-, m_folderModel(nullptr)
-, m_perStripe(0)
-, m_ignoreNextTransaction(false)
-, m_deferApplyPositions(false)
+    : QAbstractItemModel(parent)
+    , m_enabled(false)
+    , m_folderModel(nullptr)
+    , m_perStripe(0)
+    , m_ignoreNextTransaction(false)
+    , m_deferApplyPositions(false)
 {
 }
 
@@ -88,7 +87,6 @@ void Positioner::setFolderModel(QObject *folderModel)
 
         if (m_folderModel) {
             connectSignals(m_folderModel);
-            updateResolution();
             if (m_enabled) {
                 initMaps();
             }
@@ -207,20 +205,20 @@ int Positioner::nearestItem(int currentIndex, Qt::ArrowType direction)
     int vDirection = 0;
 
     switch (direction) {
-        case Qt::LeftArrow:
-            hDirection = -1;
-            break;
-        case Qt::RightArrow:
-            hDirection = 1;
-            break;
-        case Qt::UpArrow:
-            vDirection = -1;
-            break;
-        case Qt::DownArrow:
-            vDirection = 1;
-            break;
-        default:
-            return -1;
+    case Qt::LeftArrow:
+        hDirection = -1;
+        break;
+    case Qt::RightArrow:
+        hDirection = 1;
+        break;
+    case Qt::UpArrow:
+        vDirection = -1;
+        break;
+    case Qt::DownArrow:
+        vDirection = 1;
+        break;
+    default:
+        return -1;
     }
 
     QList<int> rows(m_proxyToSource.keys());
@@ -543,7 +541,6 @@ void Positioner::updatePositionsList(int perStripeForPositions)
             perStripeForPositions = m_perStripe;
 
         m_positionsHeader.emplace(PositionsHeader{.numStripes = 1 + ((rowCount() - 1) / m_perStripe), .perStripe = m_perStripe});
-        m_positions.clear();
 
         QHashIterator<int, int> it(m_proxyToSource);
 
@@ -818,7 +815,9 @@ void Positioner::sourceLayoutChanged(const QList<QPersistentModelIndex> &parents
 {
     Q_UNUSED(parents)
 
-    if (m_enabled) {
+    // Only reinitialize maps when in sorted mode. In unsorted mode, we want to preserve
+    // manual icon positions even after layout changes (e.g., after drag and drop).
+    if (m_enabled && m_folderModel->sortMode() != -1) {
         initMaps();
     }
 
@@ -967,8 +966,6 @@ void Positioner::convertFolderModelData()
     }
 
     endResetModel();
-
-    m_deferApplyPositions = false;
 }
 
 void Positioner::flushPendingChanges(bool inserted)
@@ -1051,7 +1048,9 @@ void Positioner::loadAndApplyPositionsConfig(const QString &resolution)
             }
         }
 
-        convertFolderModelData();
+        if (!m_positions.empty()) {
+            convertFolderModelData();
+        }
     }
 }
 
@@ -1114,7 +1113,7 @@ QString Positioner::loadConfigData() const
     QString confdata;
     if (m_applet) {
         confdata =
-        m_applet->config().group(QStringLiteral("General")).readEntry(QStringLiteral("positions")).replace(QStringLiteral("\\,"), QStringLiteral(","));
+            m_applet->config().group(QStringLiteral("General")).readEntry(QStringLiteral("positions")).replace(QStringLiteral("\\,"), QStringLiteral(","));
     }
     return confdata;
 }
@@ -1171,8 +1170,8 @@ QByteArray Positioner::prepareAndGetChangedPositionsJson()
 
             jsonObj[filename] = QJsonArray::fromStringList({
                 QStringList(changedPosition->visitedResolutions.constBegin(), changedPosition->visitedResolutions.constEnd()).join(','_L1),
-                                                           QString::number(changedPosition->gridPosition.stripe),
-                                                           QString::number(changedPosition->gridPosition.pos),
+                QString::number(changedPosition->gridPosition.stripe),
+                QString::number(changedPosition->gridPosition.pos),
             });
         } else {
             toRemove.push_back(filename);
@@ -1270,29 +1269,21 @@ void Positioner::maybeRestoreAndApplyChangedPositions(bool forceConvertAndSave)
     m_deferRestoreChangedPositions = false;
 }
 
-void Positioner::onItemAboutToRename(const QString &filename)
-{
-    // Store old item position
-    if (auto positionsIt = m_positions.constFind(filename); positionsIt != m_positions.constEnd()) {
-        m_toRename = {filename, positionsIt.value()};
-    }
-}
-
 void Positioner::onItemRenamed(const QString &filename, const QString &newFilename)
 {
     updatePositionsList();
-    // "m_toRename" has 3 items: filename, row, stripe-pos
-    if (m_toRename.has_value() && m_toRename->first == filename && filename != newFilename) {
+    if (filename != newFilename) {
         // Restore item position after rename
-        if (auto positionsIt = m_positions.find(newFilename); positionsIt != m_positions.end()) {
-            // Assign two items: row, stripe-pos
-            positionsIt->stripe = m_toRename->second.stripe;
-            positionsIt->pos = m_toRename->second.pos;
-            convertFolderModelData();
+        if (auto positionsIt = m_positions.find(filename); positionsIt != m_positions.end()) {
+            m_positions[newFilename] = {
+                .stripe = qMax(0, positionsIt->stripe),
+                .pos = qMax(0, positionsIt->pos),
+            };
         }
     }
-    m_toRename.reset();
+    m_positions.remove(filename);
     m_changedPositions[newFilename] = std::nullopt;
+    convertFolderModelData();
     savePositionsConfig();
 }
 
@@ -1301,9 +1292,7 @@ void Positioner::onItemRenamed(const QString &filename, const QString &newFilena
 // geometry changes
 void Positioner::onListingCompleted()
 {
-    if (screenInUse()) {
-        savePositionsConfig();
-    }
+    savePositionsConfig();
 }
 
 void Positioner::connectSignals(FolderModel *model)
@@ -1319,7 +1308,6 @@ void Positioner::connectSignals(FolderModel *model)
     connect(model, &QAbstractItemModel::layoutChanged, this, &Positioner::sourceLayoutChanged, Qt::UniqueConnection);
     connect(m_folderModel, &FolderModel::urlChanged, this, &Positioner::reset, Qt::UniqueConnection);
     connect(m_folderModel, &FolderModel::statusChanged, this, &Positioner::sourceStatusChanged, Qt::UniqueConnection);
-    connect(m_folderModel, &FolderModel::itemAboutToRename, this, &Positioner::onItemAboutToRename, Qt::UniqueConnection);
     connect(m_folderModel, &FolderModel::itemRenamed, this, &Positioner::onItemRenamed, Qt::UniqueConnection);
     connect(m_folderModel, &FolderModel::listingCompleted, this, &Positioner::onListingCompleted, Qt::UniqueConnection);
 }
@@ -1337,7 +1325,6 @@ void Positioner::disconnectSignals(FolderModel *model)
     disconnect(model, &QAbstractItemModel::layoutChanged, this, &Positioner::sourceLayoutChanged);
     disconnect(m_folderModel, &FolderModel::urlChanged, this, &Positioner::reset);
     disconnect(m_folderModel, &FolderModel::statusChanged, this, &Positioner::sourceStatusChanged);
-    disconnect(m_folderModel, &FolderModel::itemAboutToRename, this, &Positioner::onItemAboutToRename);
     disconnect(m_folderModel, &FolderModel::itemRenamed, this, &Positioner::onItemRenamed);
     disconnect(m_folderModel, &FolderModel::listingCompleted, this, &Positioner::onListingCompleted);
 }

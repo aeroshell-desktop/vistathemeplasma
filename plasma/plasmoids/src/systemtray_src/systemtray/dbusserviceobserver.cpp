@@ -6,6 +6,7 @@
 */
 
 #include "dbusserviceobserver.h"
+#include "debug.h"
 
 #include "systemtraysettings.h"
 
@@ -57,7 +58,7 @@ void DBusServiceObserver::registerPlugin(const KPluginMetaData &pluginMetaData)
 {
     const QString dbusactivation = pluginMetaData.value(QStringView(u"X-Plasma-DBusActivationService"));
     if (!dbusactivation.isEmpty()) {
-        qDebug() << "Found DBus-able Applet: " << pluginMetaData.pluginId() << dbusactivation;
+        qCDebug(SYSTEM_TRAY) << "Found DBus-able Applet: " << pluginMetaData.pluginId() << dbusactivation;
         QRegularExpression rx = QRegularExpression::fromWildcard(dbusactivation);
         m_dbusActivatableTasks[pluginMetaData.pluginId()] = rx;
 
@@ -124,7 +125,7 @@ void DBusServiceObserver::sessionBusNameFetchFinished(const QStringList &list)
 
 void DBusServiceObserver::sessionBusNameFetchError(const QDBusError &error)
 {
-    qWarning() << "Could not get list of available D-Bus services on the session bus:" << error.name() << ":" << error.message();
+    qCWarning(SYSTEM_TRAY) << "Could not get list of available D-Bus services on the session bus:" << error.name() << ":" << error.message();
 }
 
 void DBusServiceObserver::systemBusNameFetchFinished(const QStringList &list)
@@ -138,7 +139,7 @@ void DBusServiceObserver::systemBusNameFetchFinished(const QStringList &list)
 
 void DBusServiceObserver::systemBusNameFetchError(const QDBusError &error)
 {
-    qWarning() << "Could not get list of available D-Bus services on the system bus:" << error.name() << ":" << error.message();
+    qCWarning(SYSTEM_TRAY) << "Could not get list of available D-Bus services on the system bus:" << error.name() << ":" << error.message();
 }
 
 void DBusServiceObserver::serviceRegistered(const QString &service)
@@ -155,7 +156,7 @@ void DBusServiceObserver::serviceRegistered(const QString &service)
 
         const auto &rx = it.value();
         if (rx.match(service).hasMatch()) {
-            qDebug() << "DBus service" << service << "matching" << m_dbusActivatableTasks[plugin] << "appeared. Loading" << plugin;
+            qCDebug(SYSTEM_TRAY) << "DBus service" << service << "matching" << m_dbusActivatableTasks[plugin] << "appeared. Loading" << plugin;
             Q_EMIT serviceStarted(plugin);
             m_dbusServiceCounts[plugin]++;
         }
@@ -175,7 +176,7 @@ void DBusServiceObserver::serviceUnregistered(const QString &service)
             m_dbusServiceCounts[plugin]--;
             Q_ASSERT(m_dbusServiceCounts[plugin] >= 0);
             if (m_dbusServiceCounts[plugin] == 0) {
-                qDebug() << "DBus service" << service << "matching" << m_dbusActivatableTasks[plugin] << "disappeared. Unloading" << plugin;
+                qCDebug(SYSTEM_TRAY) << "DBus service" << service << "matching" << m_dbusActivatableTasks[plugin] << "disappeared. Unloading" << plugin;
                 Q_EMIT serviceStopped(plugin);
             }
         }
