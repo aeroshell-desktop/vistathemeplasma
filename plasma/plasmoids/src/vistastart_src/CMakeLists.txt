@@ -12,23 +12,19 @@ include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 include(FeatureSummary)
 
-find_package(KF6 REQUIRED REQUIRED
-    COMPONENTS
-        WindowSystem
-        Svg
-        Config
-        Service
-        I18n
-        CoreAddons
+find_package(Qt6 CONFIG REQUIRED COMPONENTS
+    Quick Core WaylandClient
 )
 
-find_package(Qt6 CONFIG REQUIRED
-    COMPONENTS
-        Quick
-        Core
+find_package(KF6 REQUIRED COMPONENTS
+    WindowSystem Svg Config
+    Service I18n CoreAddons
 )
 
-find_package(Plasma 6.0.0 REQUIRED)
+find_package(Plasma REQUIRED)
+find_package(PlasmaQuick REQUIRED)
+find_package(PlasmaWaylandProtocols REQUIRED)
+find_package(Wayland REQUIRED COMPONENTS Client)
 
 add_subdirectory(src)
 

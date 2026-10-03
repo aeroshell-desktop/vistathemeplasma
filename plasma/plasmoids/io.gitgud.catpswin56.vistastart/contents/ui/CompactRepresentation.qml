@@ -35,7 +35,6 @@ Item {
     Layout.maximumWidth: floatingOrbPanel.scaledWidth;
     width: Layout.maximumWidth
     height: Layout.maximumHeight
-    property bool compositing: false
 
     Binding {
         target: kicker
@@ -65,7 +64,7 @@ Item {
     readonly property bool editMode: Plasmoid.containment.corona.editMode
     readonly property bool inPanel: (Plasmoid.location == PlasmaCore.Types.TopEdge || Plasmoid.location == PlasmaCore.Types.RightEdge || Plasmoid.location == PlasmaCore.Types.BottomEdge || Plasmoid.location == PlasmaCore.Types.LeftEdge)
     property bool menuShown: dashWindow.visible
-    property QtObject orb: null
+    property QtObject orbW: null
     property alias orbTimer: orbTimer
     readonly property var screenGeometry: Plasmoid.screenGeometry
 
@@ -79,95 +78,35 @@ Item {
     // If the url is empty (default value), then use the fallback url. Otherwise, return the url path relative to
     // the location of the source code.
     function getResolvedUrl(url, fallback) {
-
         if (url.toString() === "" || !Plasmoid.fileExists(url)) {
             return Qt.resolvedUrl(fallback);
         }
         return url;
     }
+
     function positionOrb() {
-        var pos = kicker.mapToGlobal(floatingOrbPanel.x, floatingOrbPanel.y);
-        pos.y -= 5;
-        if(Plasmoid.configuration.offsetFloatingOrb) {
-            pos.y += 5;
-        }
-        orb.width = floatingOrbPanel.scaledWidth
-        orb.height = floatingOrbPanel.scaledHeight / 3;
-        if(orb.height === 30) {
-            pos.y += 2;
-        }
-
-		orbPos = pos;
-
-        orb.x = orbPos.x;
-        orb.y = orbPos.y;
+        console.log("positioning orb");
     }
+
     function showMenu() {
         dashWindow.visible = !dashWindow.visible;
         dashWindow.showingAllPrograms = dashWindow.mainItemCount == 0;
-        if(KWindowSystem.isPlatformX11) Plasmoid.setActiveWin(dashWindow);
         dashWindow.m_searchField.focus = true;
-        orb.raise();
-
     }
-    function updateSizeHints() {
-        return;
-        /*if (useCustomButtonImage) {
-            if (vertical) {
-                var scaledHeight = Math.floor(parent.width * (floatingOrbPanel.buttonIcon.height / floatingOrbPanel.buttonIcon.width));
-                root.Layout.minimumHeight = scaledHeight;
-                root.Layout.maximumHeight = scaledHeight;
-                root.Layout.minimumWidth = Kirigami.Units.iconSizes.small;
-                root.Layout.maximumWidth = inPanel ? Kirigami.Units.iconSizes.medium : -1;
-            } else {
-                var scaledWidth = Math.floor(parent.height * (floatingOrbPanel.buttonIcon.width / floatingOrbPanel.buttonIcon.height));
-                root.Layout.minimumWidth = scaledWidth;
-                root.Layout.maximumWidth = scaledWidth;
-                root.Layout.minimumHeight = Kirigami.Units.iconSizes.small;
-                root.Layout.maximumHeight = inPanel ? Kirigami.Units.iconSizes.medium : -1;
-            }
-        } else {
-            root.Layout.minimumWidth = Kirigami.Units.iconSizes.small;
-            root.Layout.maximumWidth = inPanel ? Kirigami.Units.iconSizes.medium : -1;
-            root.Layout.minimumHeight = Kirigami.Units.iconSizes.small;
-            root.Layout.maximumHeight = inPanel ? Kirigami.Units.iconSizes.medium : -1;
-        }
-        if (stickOutOrb && orb) {
-            root.Layout.minimumWidth = orb.width + panelSvg.margins.right * (compositing ? 0 : 1);
-            root.Layout.maximumWidth = orb.width + panelSvg.margins.right * (compositing ? 0 : 1);
-            root.Layout.minimumHeight = orb.height;
-            root.Layout.maximumHeight = orb.height;
-        }*/
-    }
-
-    //kicker.status: PlasmaCore.Types.PassiveStatus
-    //Plasmoid.status: dashWindow && dashWindow.visible ? PlasmaCore.Types.RequiresAttentionStatus : PlasmaCore.Types.PassiveStatus
-    //clip: true
 
     Component.onCompleted: {
         dashWindow = Qt.createQmlObject("MenuRepresentation {}", kicker);
-        orb = Qt.createQmlObject("StartOrb {}", kicker);
+        orbW = Qt.createQmlObject("StartOrb {}", kicker);
+        orbW.width = floatingOrbPanel.scaledWidth;
+        orbW.height = floatingOrbPanel.scaledHeight / 3;
+
+        positionOrb();
 
         orbTimer.start();
         Plasmoid.activated.connect(function () {
             showMenu();
         });
-		orb.checkPosition.connect(function () {
-			if(orb.x != orbPos.x || orb.y != orbPos.y) positionOrb();
-		});
     }
-    onCompositingChanged: {
-        updateSizeHints();
-        positionOrb();
-        compositingFix.start();
-    }
-    onHeightChanged: updateSizeHints()
-
-    onStickOutOrbChanged: {
-        updateSizeHints();
-        positionOrb();
-    }
-    onWidthChanged: updateSizeHints()
 
     Connections {
         target: Plasmoid.configuration
@@ -178,6 +117,7 @@ Item {
             positionOrb();
         }
     }
+
     Connections {
         function onScreenChanged() {
             orbTimer.start();
@@ -200,16 +140,16 @@ Item {
      * much space as they can in the compact representation while preserving their aspect
      * ratio.
      */
-
-
     FloatingOrb {
         id: floatingOrbPanel
+
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        objectName: "innerorb"
-        opacity: (!stickOutOrb)
 
+        objectName: "innerorb"
+
+        opacity: !stickOutOrb
     }
 
     // Handles all mouse events for the popup orb
@@ -230,21 +170,6 @@ Item {
         z: 99
     }
 
-    // I hate this
-
-    // So the only way I could reasonably think of to make this work is running the function
-    // with a delay.
-    Timer {
-        id: compositingFix
-
-        interval: 150
-
-        onTriggered: {
-            if (!compositing) {
-                Plasmoid.setTransparentWindow();
-            }
-        }
-    }
 
     // Even worse, this just makes things even more unsophisticated. If someone has a better
     // way of solving this, I would love to know.
@@ -254,12 +179,7 @@ Item {
         interval: 15
 
         onTriggered: {
-
-            Plasmoid.setOrb(orb);
-            // Currently hardcoded, will make it configurable soon, when it's been properly tested and hopefully slightly refactored.
-            Plasmoid.setMask(Qt.resolvedUrl("./orbs/mask.png"), false);
-            updateSizeHints();
-            positionOrb();
+            Plasmoid.setOrb(orbW);
         }
     }
 }

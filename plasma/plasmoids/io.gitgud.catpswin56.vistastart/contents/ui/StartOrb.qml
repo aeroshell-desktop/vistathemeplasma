@@ -1,22 +1,7 @@
-
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts 1.1
-import QtQuick.Dialogs
-import QtQuick.Window 2.1
 
-import org.kde.plasma.plasmoid 2.0
-import org.kde.plasma.core 2.0 as PlasmaCore
-import org.kde.plasma.components 3.0 as PlasmaComponents
-import org.kde.plasma.extras 2.0 as PlasmaExtras
-
-import org.kde.plasma.private.kicker 0.1 as Kicker
-import org.kde.coreaddons as KCoreAddons // kuser
-import org.kde.plasma.private.shell 2.0
-
-import org.kde.kwindowsystem 1.0
-
-import org.kde.kirigami 2.13 as Kirigami
+import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 
 /*
  * This is the Dialog that displays the Start menu orb when it sticks out
@@ -36,39 +21,42 @@ import org.kde.kirigami 2.13 as Kirigami
 
 PlasmaCore.Dialog {
     id: iconUser
-    flags: Qt.WindowTransparentForInput
+
+    objectName: "orb"
+
+    // flags: Qt.WindowTransparentForInput
     location: "Floating"
-
-    signal checkPosition()
-
-    type: "Notification"
-    title: "seventasks-floatingorb"
-
-    // Positions are defined later when the plasmoid has been fully loaded, to prevent undefined behavior.
-    x: 0
-    y: 0
-
-    // Input masks won't be applied correctly when compositing is disabled unless I do this. WHY?
-    onYChanged: {
-        Plasmoid.setTransparentWindow();
-        checkPosition();
-    }
-    onXChanged: {
-        Plasmoid.setTransparentWindow();
-        checkPosition();
-    }
-
-    onVisibleChanged: {
-    }
+    type: PlasmaCore.Dialog.Notification
+    title: "aeroshell-floatingorb"
     backgroundHints: PlasmaCore.Types.NoBackground // Prevents a dialog SVG background from being drawn.
-    visible: {
-        if(KWindowSystem.isPlatformX11) return kicker.compositingEnabled ? true : stickOutOrb;
-        return stickOutOrb
+
+    visible: stickOutOrb
+    onVisibleChanged: {
+        tim.start();
     }
-    opacity: iconUser.visible && root.visible && stickOutOrb// To prevent even more NP-hard unpredictable behavior and visual glitches.
 
     // The actual orb button, this dialog window is just a container for it.
     mainItem: FloatingOrb {
         id: floatingOrbIcon
+
+        Timer {
+            id: tim
+            property int c: 0
+            interval: 1
+            repeat: true
+            onTriggered: {
+                console.log("orb positioning start");
+                var pos = kicker.mapToGlobal(kicker.x, kicker.height);
+                console.log(pos);
+                iconUser.x = pos.x;
+                iconUser.y = Screen.height - iconUser.height;
+                console.log("orb positioning end");
+                Plasmoid.setOrb(orbW);
+
+                if (c++ == 5) {
+                    stop();
+                }
+            }
+        }
     }
 }

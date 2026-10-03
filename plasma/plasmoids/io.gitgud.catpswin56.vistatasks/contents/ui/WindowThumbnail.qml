@@ -7,9 +7,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.ksvg as KSvg
 import org.kde.pipewire as PipeWire
 import org.kde.taskmanager as TaskManager
-import org.kde.kwindowsystem
 
-import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.plasmoid
 import org.kde.plasma.private.mpris as Mpris
 
@@ -287,7 +285,7 @@ MouseArea {
 
                 active: true
                 asynchronous: true
-                sourceComponent: minimized ? appIcon : (KWindowSystem.isPlatformWayland ? (tasks.toolTipOpen ? waylandThumbnail : undefined) : x11Thumbnail)
+                sourceComponent: minimized ? appIcon : (tasks.toolTipOpen ? pipewireSource : undefined)
 
                 onLoaded: {
                     if(sourceComponent == appIcon) thumbnailRoot.thumbnailWidth = thumbnailLoader.width;
@@ -296,55 +294,7 @@ MouseArea {
                 }
 
                 Component {
-                    id: x11Thumbnail
-
-                    PlasmaCore.WindowThumbnail {
-                        winId: windows !== undefined ? windows[0] : undefined
-
-                        onPaintedSizeChanged: {
-                            thumbnailRoot.thumbnailWidth = paintedWidth;
-                            thumbnailRoot.thumbnailHeight = paintedHeight;
-                        }
-
-                        Close {
-                            anchors.centerIn: parent
-                            anchors.horizontalCenterOffset: parent.paintedWidth/2 - 8
-                            anchors.verticalCenterOffset: -parent.paintedHeight/2 + 8
-                        }
-
-                        Rectangle {
-                            anchors.centerIn: parent
-
-                            width: parent.paintedWidth+2
-                            height: parent.paintedHeight+2
-
-                            color: "transparent"
-
-                            border.width: 1
-                            border.color: "black"
-
-                            opacity: 0.5
-                        }
-
-                        Rectangle {
-                            anchors.centerIn: parent
-
-                            width: parent.paintedWidth+4
-                            height: parent.paintedHeight+4
-
-                            color: "transparent"
-
-                            border.width: 1
-                            border.color: "white"
-                            radius: 2
-
-                            opacity: 0.5
-                        }
-                    }
-                }
-
-                Component {
-                    id: waylandThumbnail
+                    id: pipewireSource
 
                     PipeWire.PipeWireSourceItem {
                         id: wl_pw_src

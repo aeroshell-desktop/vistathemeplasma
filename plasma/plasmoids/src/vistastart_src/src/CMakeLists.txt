@@ -7,9 +7,16 @@ set(VistaStart_SRCS
 )
 
 add_library(io.gitgud.catpswin56.vistastart MODULE ${VistaStart_SRCS})
+qt_generate_wayland_protocol_client_sources(io.gitgud.catpswin56.vistastart
+    FILES
+        "${PLASMA_WAYLAND_PROTOCOLS_DIR}/plasma-shell.xml"
+        "${Wayland_DATADIR}/wayland.xml"
+    PRIVATE_CODE
+)
 
 target_link_libraries(io.gitgud.catpswin56.vistastart
     PRIVATE
+        Wayland::Client
         Qt6::Gui
         Qt6::Quick
         KF6::I18n

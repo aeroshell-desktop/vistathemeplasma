@@ -184,9 +184,6 @@ PlasmaCore.Dialog {
 			y = screen.y + availScreen.height - root.height;
 		}
     }
-    function raiseOrb() {
-		orb.raise();
-	}
 
 	function isTouchingTopEdge() {
 		if(Plasmoid.location === PlasmaCore.Types.LeftEdge || Plasmoid.location === PlasmaCore.Types.RightEdge)
