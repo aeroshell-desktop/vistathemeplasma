@@ -22,6 +22,3 @@ ecm_add_qml_module(positionmanagerplugin
 )
 ecm_finalize_qml_module(positionmanagerplugin)
 
-install(TARGETS positionmanagerplugin ${KDE_INSTALL_TARGETS_DEFAULT_ARGS} LIBRARY NAMELINK_SKIP)
-
-

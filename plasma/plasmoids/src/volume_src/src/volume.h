@@ -10,12 +10,7 @@
 #include <Plasma/Applet>
 #include <QVariant>
 #include <QWindow>
-#include <kwindowsystem.h>
-#include <kx11extras.h>
-#include <kwindoweffects.h>
 #include <KSharedConfig>
-
-#include <PlasmaQuick/PlasmaShellWaylandIntegration>
 
 class Volume : public Plasma::Applet
 {
@@ -24,19 +19,12 @@ class Volume : public Plasma::Applet
 public:
     Volume(QObject *parentObject, const KPluginMetaData &data, const QVariantList &args);
     ~Volume();
-    Q_INVOKABLE void setPopupPosition(QWindow* w, int x, int y)
-    {
-        PlasmaShellWaylandIntegration::get(w)->setPosition(QPoint(x, y));
-    }
 
-    Q_INVOKABLE QString getDecorationPluginName()
-    {
-        return m_config->group(QStringLiteral("org.kde.kdecoration2")).readEntry(QStringLiteral("library"), QStringLiteral("org.smod.smod"));
-    }
-    Q_INVOKABLE QString getDecorationThemeName()
-    {
-        return m_config->group(QStringLiteral("org.kde.kdecoration2")).readEntry(QStringLiteral("theme"), QStringLiteral("SMOD"));
-    }
+    Q_INVOKABLE void setPopupPosition(QWindow* w, int x, int y) const;
+
+    Q_INVOKABLE QString getDecorationPluginName() const;
+    Q_INVOKABLE QString getDecorationThemeName() const;
+
 private:
     KSharedConfig::Ptr m_config;
 };
