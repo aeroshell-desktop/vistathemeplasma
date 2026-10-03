@@ -75,7 +75,6 @@ Q_SIGNALS:
 
 private:
     bool m_docked = false;
-    bool m_X11_underlap = false;
 
     QQuickWindow *m_window = nullptr;
     bool m_reserveScreenArea = false;

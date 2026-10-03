@@ -16,9 +16,8 @@
 
 #include <LayerShellQt/Window>
 
-#include <KX11Extras>
 #include <KWindowSystem>
-#include <KF6/KWindowSystem/kwindoweffects.h>
+#include <KWindowEffects>
 #include <KActionCollection> // Applet::actions
 
 Sidebar::Sidebar(QObject *parent, const KPluginMetaData &data, const QVariantList &args)
@@ -177,84 +176,32 @@ void Sidebar::configureWindow()
 
     QRect rect = m_window->geometry();
 
-    if (KWindowSystem::isPlatformX11()) {
-        WId windowId = m_window->winId();
+    if (m_layerWindow && m_shellWindow) {
+        LayerShellQt::Window::Anchors anchors;
+        anchors.setFlag(LayerShellQt::Window::AnchorTop);
+        anchors.setFlag(LayerShellQt::Window::AnchorBottom);
 
-        if (!m_docked) {
-            KX11Extras::setType(windowId, NET::Normal);
+        if (m_positionRight) {
+            anchors.setFlag(LayerShellQt::Window::AnchorRight);
+        } else {
+            anchors.setFlag(LayerShellQt::Window::AnchorLeft);
         }
 
-        NET::States states;
-        states |= NET::SkipTaskbar;
-        states |= NET::SkipPager;
-        states |= NET::SkipSwitcher;
-
-        KX11Extras::setOnAllDesktops(windowId, true);
-        KX11Extras::setState(windowId, states);
+        m_layerWindow->setAnchors(anchors);
+        m_shellWindow->setPanelBehavior(QtWayland::org_kde_plasma_surface::panel_behavior_always_visible);
 
         if (!m_reserveScreenArea && m_docked) {
-            m_window->setX(m_window->screen()->geometry().width() - rect.width());
-            m_window->setY(0);
-            m_window->setHeight(m_window->screen()->availableGeometry().height());
-
-            KX11Extras::setExtendedStrut(windowId,
-                                         0, 0, 0,
-                                         0, 0, 0,
-                                         0, 0, 0,
-                                         0, 0, 0);
+            m_layerWindow->setExclusiveZone(0);
+            m_layerWindow->setLayer(LayerShellQt::Window::LayerBottom);
+            m_layerWindow->setScope(QStringLiteral(""));
             m_docked = false;
-            KX11Extras::setType(windowId, NET::Normal);
         }
 
         if (m_reserveScreenArea) {
-            KX11Extras::setType(windowId, NET::Dock);
-
-            if (!m_positionRight) {
-                KX11Extras::setExtendedStrut(windowId,
-                                             rect.width(), rect.y(), rect.y() + rect.height(),
-                                             0, 0, 0,
-                                             0, 0, 0,
-                                             0, 0, 0);
-
-            } else {
-                KX11Extras::setExtendedStrut(windowId,
-                                             0, 0, 0,
-                                             rect.width(), rect.y(), rect.y() + rect.height(),
-                                             0, 0, 0,
-                                             0, 0, 0);
-
-            }
-
+            m_layerWindow->setExclusiveZone(rect.width());
+            m_layerWindow->setLayer(LayerShellQt::Window::LayerTop);
+            m_layerWindow->setScope(QStringLiteral("dock"));
             m_docked = true;
-        }
-    } else {
-        if (m_layerWindow && m_shellWindow) {
-            LayerShellQt::Window::Anchors anchors;
-            anchors.setFlag(LayerShellQt::Window::AnchorTop);
-            anchors.setFlag(LayerShellQt::Window::AnchorBottom);
-
-            if (m_positionRight) {
-                anchors.setFlag(LayerShellQt::Window::AnchorRight);
-            } else {
-                anchors.setFlag(LayerShellQt::Window::AnchorLeft);
-            }
-
-            m_layerWindow->setAnchors(anchors);
-            m_shellWindow->setPanelBehavior(QtWayland::org_kde_plasma_surface::panel_behavior_always_visible);
-
-            if (!m_reserveScreenArea && m_docked) {
-                m_layerWindow->setExclusiveZone(0);
-                m_layerWindow->setLayer(LayerShellQt::Window::LayerBottom);
-                m_layerWindow->setScope(QStringLiteral(""));
-                m_docked = false;
-            }
-
-            if (m_reserveScreenArea) {
-                m_layerWindow->setExclusiveZone(rect.width());
-                m_layerWindow->setLayer(LayerShellQt::Window::LayerTop);
-                m_layerWindow->setScope(QStringLiteral("dock"));
-                m_docked = true;
-            }
         }
     }
 
