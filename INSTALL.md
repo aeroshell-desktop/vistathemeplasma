@@ -23,11 +23,6 @@ Required packages:
 pacman -S git cmake extra-cmake-modules ninja curl unzip qt6-virtualkeyboard qt6-multimedia qt6-5compat qt6-wayland plasma-wayland-protocols plasma5support kvantum sddm sddm-kcm base-devel plasma-nm plasma-pa plasma-workspace plasma-desktop wayland-protocols vulkan-headers
 ```
 
-Since Plasma 6.4, the X11 session has been separated from the main codebase. On Arch Linux, additional dependencies for X11 include:
-
-- `kwin-x11`
-- `plasma-x11-session`
-
 KSysGuard has been officially deprecated by KDE, however an unofficial [port](https://github.com/zvova7890/ksysguard6) exists for Qt6, which can be installed using the [AUR](https://aur.archlinux.org/packages/ksysguard6-git) package on Arch-based distros.
 
 ### Note: Dependencies for other distros besides Arch Linux have been provided by contributors and aren't updated frequently, which may result in incorrect or missing dependencies.
@@ -40,11 +35,6 @@ Required Packages:
 dnf install gcc gcc-c++ cmake make extra-cmake-modules plasma-workspace-devel libksysguard-devel unzip kvantum qt6-qtmultimedia-devel qt6-qt5compat-devel libplasma-devel qt6-qtbase-devel qt6-qtwayland-devel plasma-activities-devel kf6-kpackage-devel kf6-kglobalaccel-devel qt6-qtsvg-devel wayland-devel plasma-wayland-protocols kf6-ksvg-devel kf6-kcrash-devel kf6-kguiaddons-devel kf6-kcmutils-devel kf6-kio-devel kdecoration-devel kf6-ki18n-devel kf6-knotifications-devel kf6-kirigami-devel kf6-kiconthemes-devel cmake gmp-ecm-devel kf5-plasma-devel libepoxy-devel kwin-devel kf6-karchive kf6-karchive-devel plasma-wayland-protocols-devel qt6-qtbase-private-devel qt6-qtbase-devel kf6-knewstuff-devel kf6-knotifyconfig-devel kf6-attica-devel kf6-krunner-devel kf6-kdbusaddons-devel kf6-sonnet-devel plasma5support-devel plasma-activities-stats-devel polkit-qt6-1-devel qt-devel libdrm-devel kf6-kitemmodels-devel kf6-kstatusnotifieritem-devel kf6-frameworkintegration-devel layer-shell-qt-devel wayland-protocols-devel
 ```
 
-On Fedora, additional dependencies for X11 include:
-
-- `kwin-x11`
-- `kwin-x11-devel`
-
 ### openSUSE Leap / Tumbleweed
 
 Required packages:
@@ -53,20 +43,11 @@ Required packages:
 zypper install cmake make ninja gcc gcc-c++ gmp-ecm-devel kf6-extra-cmake-modules qt6-base-devel qt6-quick-devel qt6-svg-devel qt6-quickcontrols2-devel kf6-kwindowsystem-devel kf6-karchive-devel kf6-kirigami-devel kf6-kbookmarks-devel kf6-kcodecs-devel kf6-kcolorscheme-devel kf6-kcompletion-devel kf6-kconfig-devel kf6-kconfigwidgets-devel kf6-kcoreaddons-devel kf6-kguiaddons-devel kf6-ki18n-devel kf6-kio-devel kf6-kitemviews-devel kf6-kjobwidgets-devel kf6-kservice-devel kf6-kwidgetsaddons-devel kf6-kxmlgui-devel kf6-solid-devel kf6-kglobalaccel-devel kf6-kiconthemes-devel kf6-knotifications-devel kf6-kpackage-devel kf6-ksvg-devel plasma6-activities-devel plasma-wayland-protocols qt6-wayland-devel qt6-quicktest-devel qt6-gui-private-devel kdecoration6-devel kf6-kcmutils-devel qt6-uitools-devel kf6-kcrash-devel libepoxy-devel kwin6-devel kwin6-x11-devel kf6-qqc2-desktop-style-devel knotifications-devel kf6-kauth-devel libplasma6-devel plasma5support6-devel plasma6-activities-stats-devel plasma6-workspace-devel
 ```
 
-In openSUSE, additional dependencies for X11 include:
-
-- `kwin6-x11-devel`
-
 ### Ubuntu 26.04
 
 ```bash
 apt install build-essential cmake ninja-build curl libqt6virtualkeyboard6 libqt6multimedia6 libqt6core5compat6 libplasma5support6 libkdecorations3-dev libkf6colorscheme-dev libkf6i18n-dev libkf6iconthemes-dev libkf6kcmutils-dev libkirigami-dev libkf6kio-dev libkf6notifications-dev libkf6svg-dev libkf6crash-dev libkf6globalaccel-dev libplasma-dev libplasmaactivities-dev libxcb-composite0-dev libxcb-randr0-dev libxcb-shm0-dev libxcb-damage0-dev libepoxy-dev libqt6svg6-dev kwin-dev plasma-wayland-protocols libkf5qqc2desktopstyle-dev libkf6qqc2desktopstyle-dev libplasma5support-dev libkf6auth-dev libkf6newstuff-dev libkf6notifyconfig-dev libkf6attica-dev libkf6runner-dev libkf6dbusaddons-dev libkf6sonnet-dev libkf6xmlgui-dev libkf6coreaddons-dev libkf6widgetsaddons-dev libkf6guiaddons-dev qt6-base-dev qt6-5compat-dev qml-module-org-kde-qqc2desktopstyle libplasmaactivitiesstats-dev plasma-workspace-dev libkf6statusnotifieritem-dev qml6-module-org-kde-kirigamiaddons-sounds polkit-kde-agent-1 kio kio6 polkitd libpolkit-qt6-1-dev libksysguard-dev libdrm-dev liblayershellqtinterface-dev liblayershellqtinterface6
 ```
-
-On Ubuntu, additional dependencies for X11 include:
-
-- `kwin-x11`
-- `kwin-x11-dev`
 
 ## Migration notice <a name="migration"></a>
 
@@ -103,12 +84,12 @@ It's highly recommended to use git for downloading VistaThemePlasma as updating 
 Run the following script:
 
 ```sh
-$ bash install.sh [--skip-x11] # --skip-x11 to skip building X11 components
+$ bash install.sh
 ``` 
 
 **NOTE:** The `--ninja` argument has been replaced for `CMAKE_GENERATOR`. Set `CMAKE_GENERATOR=Ninja` before running the script if you wish to use Ninja instead. Like so:
 
-```sh
+```bash
 $ CMAKE_GENERATOR=Ninja bash install.sh # pass any other arguments after this
 ```
 
@@ -136,8 +117,6 @@ The script relies on `LIBEXEC_DIR` and `UAC_LIBEXEC_DIR` in order to determine t
 ```bash
 $ LIBEXEC_DIR=libexec UAC_LIBEXEC_DIR=libexec/kf6 bash install.sh --ninja
 ```
-
-Additionally, for distros that don't ship the X11 version of KWin, pass the argument `--skip-x11` to the install script in order to avoid building components that depend on X11. 
 
 The script will ask for admin privileges for file installation. Do **NOT** run any of the provided install scripts with sudo/doas or as root.
 

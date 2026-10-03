@@ -13,17 +13,13 @@ fi
 
 BUILD_FILES=(
         "repos/aeroshell-kwin-components/build"
-        "repos/aeroshell-kwin-components/build_x11"
         "repos/aeroshell-workspace/build"
         "repos/aeroshell-sddm-kcm/build"
         "repos/vistathemeplasma-icons/build"
         "repos/vistathemeplasma-sounds/build"
         "repos/smod/build"
-        "repos/smod/smodglow/build"
-        "repos/smod/smodglow/build-wl"
         "repos/uac-polkit-agent/build"
         "build"
-        "build_x11"
 )
 
 function uninstall_cmake_component {

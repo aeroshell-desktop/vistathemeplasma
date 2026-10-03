@@ -45,7 +45,6 @@ Only Arch-based distributions are supported officially for VistaThemePlasma, and
 
 Currently the only application (not really an application but I don't care) that has been recreated is the Run dialog. As for the other applications (at least a Windows 7 variant of them), [Sevulet](https://gitgud.io/snailatte/sevulet) exists, which is a project that aims to port Windows 7 apps to Linux. It also has a pretty solid file explorer, so consider checking it out if you're okay with using Windows 7 apps in VTP!
 
-
 ## List of components <a name="list-of-components"></a>
 
 - Plasma
