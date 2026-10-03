@@ -8,8 +8,6 @@ set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
 set(PROJECT_VERSION "6.8.0")
 set(PROJECT_VERSION_MAJOR 6)
 
-option(INSTALL_X11_COMPONENTS "Install X11 session files" OFF)
-
 include(KDEInstallDirs)
 include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
@@ -23,9 +21,7 @@ find_package(Qt6 REQUIRED COMPONENTS
 )
 
 add_subdirectory(plasma)
-if(NOT INSTALL_X11_COMPONENTS)
-    add_subdirectory(misc)
+add_subdirectory(misc)
     add_subdirectory(libpositionmanager)
-endif()
 
 install()
