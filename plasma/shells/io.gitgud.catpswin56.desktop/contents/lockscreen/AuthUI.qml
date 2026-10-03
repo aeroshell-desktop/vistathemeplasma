@@ -44,10 +44,10 @@ Item {
     }
 
     function beginAuth() {
-        if(!authenticator.graceLocked && password.enabled) {
+        if (password.enabled) {
             root.showedMessage = false;
-            authenticator.startAuthenticating();
             pageView.replaceCurrentItem(welcomePage);
+            authenticator.respond(password.text);
         }
     }
 
@@ -103,17 +103,27 @@ Item {
                 return;
             }
             showMessage(i18nd("kscreenlocker_greet", "The user name or password is incorrect."), "dialog-error");
+            authenticator.startAuthenticating();
         }
         function onInfoMessageChanged() {
+            if (authenticator.infoMessage == "") {
+                return;
+            }
             showMessage(authenticator.infoMessage, "dialog-information");
         }
         function onErrorMessageChanged() {
+            if (authenticator.errorMessage == "") {
+                return;
+            }
             showMessage(authenticator.errorMessage, "dialog-error");
         }
         function onPromptForSecretChanged() {
-            authenticator.respond(password.text);
+            if (authenticator.promptForSecret == "") {
+                return;
+            }
         }
         function onSucceeded() {
+            keepActiveTimer.stop();
             lockSuccess.play();
             fadeExitDelay.start();
         }
@@ -162,13 +172,21 @@ Item {
 
     MediaPlayer {
         id: lockSuccess
-        audioOutput: AudioOutput {}
+        audioOutput: AudioOutput {  }
     }
     // END LOGIN SOUND HACK
 
     Component.onCompleted: {
         executable.exec("kreadconfig6 --file ~/.config/kdeglobals --group Sounds --key Theme");
         root.resetFocus();
+        keepActiveTimer.running = true;
+    }
+
+    Timer {
+        id: keepActiveTimer
+        repeat: true
+        interval: 1000
+        onTriggered: authenticator.startAuthenticating();
     }
 
     Timer {
@@ -203,7 +221,7 @@ Item {
         id: authTimeout
         interval: 3000
         onTriggered: {
-            if(root.hasMessage) {
+            if (root.hasMessage) {
                 pageView.replaceCurrentItem(statusPage);
                 k.forceActiveFocus();
             }
@@ -222,11 +240,11 @@ Item {
             anchors.fill: parent
 
             initialItem: mainPage
-            replaceEnter: Transition {}
-            replaceExit: Transition {}
+            replaceEnter: Transition {  }
+            replaceExit: Transition {  }
 
             onCurrentItemChanged: {
-                if(currentItem === welcomePage) {
+                if (currentItem === welcomePage) {
                     authTimeout.start();
                 }
             }
@@ -341,7 +359,7 @@ Item {
                                 anchors.fill: parent
 
                                 hoverEnabled: true
-                                enabled: !authenticator.busy
+                                // enabled: !authenticator.busy
                                 onClicked: root.beginAuth();
                             }
                         }
