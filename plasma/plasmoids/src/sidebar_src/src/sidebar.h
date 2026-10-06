@@ -31,7 +31,8 @@ class Sidebar : public Plasma::Containment
     Q_PROPERTY(bool reserveScreenArea READ reserveScreenArea WRITE setReserveScreenArea NOTIFY reserveScreenAreaChanged)
     Q_PROPERTY(bool positionRight READ positionRight WRITE setPositionRight NOTIFY positionRightChanged)
 public:
-    explicit Sidebar(QObject *parent, const KPluginMetaData &data, const QVariantList &args);
+    Sidebar(QObject *parent, const KPluginMetaData &data, const QVariantList &args);
+    ~Sidebar();
 
     // Creates an applet
     Q_INVOKABLE void newTask(const QString &task);

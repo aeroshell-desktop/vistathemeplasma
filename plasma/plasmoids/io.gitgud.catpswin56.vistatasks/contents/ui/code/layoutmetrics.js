@@ -10,16 +10,6 @@
 const iconMargin = Math.round(Kirigami.Units.smallSpacing / 4);
 const labelMargin = Kirigami.Units.smallSpacing;
 
-function horizontalMargins() {
-    const spacingAdjustment = (tasks.plasmoid.pluginName === "org.kde.plasma.icontasks") ? (Kirigami.Settings.tabletMode ? 3 : tasks.plasmoid.configuration.iconSpacing) : 1
-    return (taskFrame.margins.left + taskFrame.margins.right) * (tasks.vertical ? 1 : spacingAdjustment);
-}
-
-function verticalMargins() {
-    const spacingAdjustment = (tasks.plasmoid.pluginName === "org.kde.plasma.icontasks") ? (Kirigami.Settings.tabletMode ? 3 : tasks.plasmoid.configuration.iconSpacing) : 1
-    return (taskFrame.margins.top + taskFrame.margins.bottom) * (tasks.vertical ? spacingAdjustment : 1);
-}
-
 function adjustMargin(height, margin) {
     const available = height - verticalMargins();
 
@@ -45,7 +35,7 @@ function optimumCapacity(width, height) {
 function preferredMinWidth() {
     let width = preferredMinLauncherWidth();
 
-    if (!tasks.vertical && !tasks.iconsOnly) {
+    if (!tasks.vertical) {
       width = tasks.height;
     }
 
@@ -53,15 +43,7 @@ function preferredMinWidth() {
 }
 
 function preferredMaxWidth() {
-    if (tasks.iconsOnly) {
-        if (tasks.vertical) {
-            return tasks.width + verticalMargins();
-        } else {
-            return preferredMinLauncherWidth();//tasks.height + horizontalMargins();
-        }
-    }
-
-    if (tasks.plasmoid.configuration.groupingStrategy != 0 && !tasks.plasmoid.configuration.groupPopups && !tasks.iconsOnly) {
+    if (tasks.plasmoid.configuration.groupingStrategy != 0 && !tasks.plasmoid.configuration.groupPopups) {
         return 158;
     }
 
@@ -86,11 +68,7 @@ function spaceRequiredToShowText() {
 
 function preferredMinLauncherWidth() {
     const baseWidth = tasks.vertical ? preferredMinHeight() : (tasks.height > 30 ? 60 : 44);
-
-    return baseWidth; //Math.min(tasks.height, Kirigami.Units.iconSizes.small * 3);
-
-    //return (baseWidth + horizontalMargins())
-        //- (adjustMargin(baseWidth, taskFrame.margins.top) + adjustMargin(baseWidth, taskFrame.margins.bottom));
+    return baseWidth;
 }
 
 function maximumContextMenuTextWidth() {
@@ -121,7 +99,7 @@ function layout(container) {
 
         adjustedWidth = width;
 
-        if (!tasks.vertical && !tasks.iconsOnly && (plasmoid.configuration.separateLaunchers || stripes == 1)) {
+        if (!tasks.vertical && (plasmoid.configuration.separateLaunchers || stripes == 1)) {
             if (item.m.IsLauncher === true
                 || (!plasmoid.configuration.separateLaunchers && item.m.IsStartup === true && item.m.HasLauncher === true)) {
                 adjustedWidth = launcherWidth();

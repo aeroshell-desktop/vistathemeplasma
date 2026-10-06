@@ -65,13 +65,10 @@ PlasmaCore.ToolTipArea {
 
     activeFocusOnTab: true
 
-    visible: !model.IsStartup && !model.IsLauncher
-
-    // To achieve a bottom to top layout, the task manager is rotated by 180 degrees(see main.qml).
-    // This makes the tasks mirrored, so we mirror them again to fix that.
-    rotation: Plasmoid.configuration.reverseMode && Plasmoid.formFactor === PlasmaCore.Types.Vertical ? 180 : 0
+    visible: !model.IsStartup && !model.IsLauncher && implicitWidth > 0
 
     implicitHeight: LayoutMetrics.preferredTaskHeight();
+    // TODO: maybe rewrite this part to be better
     implicitWidth: {
         if(tasksRoot.vertical) {
             return tasksRoot.width;
@@ -401,19 +398,6 @@ TaskManagerApplet.SmartLauncherItem { }
         }
 
         PlasmaExtras.MenuItem {
-            enabled: model.IsShadeable
-            visible: Qt.platform.pluginName !== "wayland"
-
-            checkable: true
-            checked: model.IsShaded
-
-            text: i18n("&Shade")
-            icon: "window-shade"
-
-            onClicked: tasksModel.requestToggleShaded(modelIndex())
-        }
-
-        PlasmaExtras.MenuItem {
             separator: true
         }
 
@@ -441,9 +425,7 @@ TaskManagerApplet.SmartLauncherItem { }
                 tasksModel.requestClose(modelIndex());
             }
         }
-
     }
-
 
     function updateAudioStreams(args) {
         if (args) {

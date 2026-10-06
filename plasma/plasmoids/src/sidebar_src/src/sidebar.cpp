@@ -26,6 +26,10 @@ Sidebar::Sidebar(QObject *parent, const KPluginMetaData &data, const QVariantLis
     setHasConfigurationInterface(true);
 }
 
+Sidebar::~Sidebar()
+{
+}
+
 void Sidebar::newTask(const QString &task)
 {
     createApplet(task, QVariantList());

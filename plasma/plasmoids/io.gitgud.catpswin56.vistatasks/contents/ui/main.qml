@@ -36,8 +36,6 @@ PlasmoidItem {
 
     readonly property bool shouldShrinkToZero: tasksModel.count === 0
     property bool vertical: Plasmoid.formFactor === PlasmaCore.Types.Vertical
-    // TODO: nuke this already
-    property bool iconsOnly: false //Plasmoid.pluginName === "org.kde.plasma.icontasks"
 
     // Used to run separate programs through this plasmoid.
     Plasma5Support.DataSource {
@@ -71,13 +69,10 @@ PlasmoidItem {
         }
     ]
 
-    onIconsOnlyChanged: {
-        iconGeometryTimer.start();
-    }
-
-    property var jumpListItem: null
     property bool pinnedToolTipOpen: false
     property bool toolTipOpen: false
+
+    property var jumpListItem: null
     onJumpListItemChanged: {
         taskList.forceMouseEvent();
     }
@@ -93,26 +88,6 @@ PlasmoidItem {
 
     property alias taskBackend: backend
     property alias mediaBackend: mpris2Source
-
-    property string plasmoidLocationString: {
-        switch (Plasmoid.location) {
-            case PlasmaCore.Types.LeftEdge:
-                return "west";
-            case PlasmaCore.Types.TopEdge:
-                return "north";
-            case PlasmaCore.Types.RightEdge:
-                return "east";
-            case PlasmaCore.Types.BottomEdge:
-                return "south";
-        }
-        return "";
-    }
-
-    property bool compositionEnabled: {
-        if(KWindowSystem.isPlatformX11) {
-            return KX11Extras.compositingActive;
-        } else return true; // Composition is always enabled in Wayland
-    }
 
     Item {
         id: animationManager
@@ -351,6 +326,7 @@ PlasmoidItem {
 
     Item {
         anchors.fill: parent
+        anchors.leftMargin: 1
 
         TaskManager.VirtualDesktopInfo {
             id: virtualDesktopInfo
@@ -400,11 +376,6 @@ PlasmoidItem {
             }
         }
 
-        Component {
-            id: busyIndicator
-            PlasmaComponents3.BusyIndicator { visible: false}
-        }
-
         // Save drag data
         Item {
             id: dragHelper
@@ -412,15 +383,6 @@ PlasmoidItem {
             Drag.dragType: Drag.Automatic
             Drag.supportedActions: Qt.CopyAction | Qt.MoveAction | Qt.LinkAction
             Drag.onDragFinished: tasks.dragSource = null;
-        }
-
-        KSvg.FrameSvgItem {
-            id: taskFrame
-
-            visible: false;
-
-            imagePath: "widgets/tasks";
-            prefix: TaskTools.taskPrefix("normal", Plasmoid.location)
         }
 
         MouseHandler {
@@ -461,7 +423,7 @@ PlasmoidItem {
             height: 30
 
             asynchronous: true
-            active: libplasmaPatched
+            active: aeroshellLibplasma
             source: "TaskList.qml"
         }
 
@@ -475,13 +437,14 @@ PlasmoidItem {
                 tasks,
                 "libplasmaTest"
             );
-            if(testComponent.status !== Component.Error) {
+            if (testComponent.status !== Component.Error) {
                 taskListLoader.aeroshellLibplasma = true;
                 testComponent.destroy();
             }
         }
 
-        Row {
+        // TODO: only load this when aeroshell-libplasma is not installed
+        RowLayout {
             id: libplasmaPatchesMissing
 
             anchors.fill: parent
@@ -491,18 +454,15 @@ PlasmoidItem {
             visible: !taskListLoader.aeroshellLibplasma
 
             Kirigami.Icon {
-                anchors.verticalCenter: parent.verticalCenter
-
-                width: 16
-                height: 16
+                implicitWidth: 16
+                implicitHeight: 16
 
                 source: "dialog-error"
             }
 
             Text {
-                anchors.verticalCenter: parent.verticalCenter
-
-                width: parent.width - 20
+                Layout.alignment: Qt.AlignVCenter
+                Layout.fillWidth: true
 
                 text: i18n("VistaTasks requires aeroshell-libplasma to be installed in your system in order to work. Please make sure to install it and reboot your system.")
                 color: "white"
@@ -572,8 +532,6 @@ PlasmoidItem {
     Component.onCompleted: {
         TaskTools.taskManagerInstanceCount += 1;
         tasks.requestLayout.connect(iconGeometryTimer.restart);
-        // tasks.windowsHovered.connect(backend.windowsHovered);
-        // tasks.activateWindowView.connect(backend.activateWindowView);
     }
 
     Component.onDestruction: {
