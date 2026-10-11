@@ -7,16 +7,17 @@
 import QtQuick
 import QtQuick.Layouts
 
-import org.kde.plasma.core as PlasmaCore
-import org.kde.plasma.extras as PlasmaExtras
-import org.kde.plasma.components as PlasmaComponents3
-import aeroshell.taskmanager as TaskManagerApplet
-import org.kde.plasma.plasmoid
+import Qt5Compat.GraphicalEffects
 
 import org.kde.ksvg as KSvg
 import org.kde.kirigami as Kirigami
 
-import Qt5Compat.GraphicalEffects
+import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.extras as PlasmaExtras
+import org.kde.plasma.components as PlasmaComponents3
+import org.kde.plasma.plasmoid
+
+import aeroshell.taskmanager as TaskManagerApplet
 
 import "code/layoutmetrics.js" as LayoutMetrics
 import "code/tools.js" as TaskTools
@@ -26,6 +27,7 @@ PlasmaCore.ToolTipArea {
 
     // BEGIN TOOLTIP CODE
     readonly property real attentionAnimOpacity: attentionFrame.opacity > 0 ? 1 : attentionGlow.opacity
+
     property Item taskThumbnail: tasksRoot.taskThumbnail
 
     active: !jumpListOpen
@@ -39,7 +41,9 @@ PlasmaCore.ToolTipArea {
     onAboutToShow: updateToolTipBindings();
 
     onToolTipVisibleChanged: (toolTipVisible) => {
-        if(!toolTipVisible) taskThumbnail.taskIndex = -1;
+        if (!toolTipVisible) {
+            taskThumbnail.taskIndex = -1;
+        }
 
         tasksRoot.toolTipOpen = toolTipVisible;
     }
@@ -65,28 +69,22 @@ PlasmaCore.ToolTipArea {
 
     activeFocusOnTab: true
 
-    visible: !model.IsStartup && !model.IsLauncher && implicitWidth > 0
-
     implicitHeight: LayoutMetrics.preferredTaskHeight();
-    // TODO: maybe rewrite this part to be better
     implicitWidth: {
         if(tasksRoot.vertical) {
             return tasksRoot.width;
         } else {
-            if(model.IsLauncher || model.IsStartup) {
-                return -taskList.spacing;
-            } else {
-                var minWidth = LayoutMetrics.preferredMinWidth();
-                var maxWidth = LayoutMetrics.preferredMaxWidth();
+            var minWidth = task.height;
+            var maxWidth = 158;
 
-                var taskCount = taskList.contentItem.visibleChildren.length;
-                if(taskCount <= 1) taskCount = taskList.count
-                if(taskCount < 0) taskCount = 0;
-                var launcherCount = tasksModel.logicalLauncherCount;
-                if(launcherCount === 0) launcherCount = 1;
-                var currentWidth = Math.floor((taskList.width - (LayoutMetrics.preferredMinLauncherWidth()+16) * (launcherCount)) / (taskList.count - tasksModel.logicalLauncherCount));
-                return Math.min(maxWidth, Math.max(minWidth, currentWidth));
+            var taskCount = taskList.count;
+            var availableWidth = taskList.width - (taskList.spacing * (taskCount - 1));
+            if (availableWidth <= 0) {
+                return 0;
             }
+
+            var scale = Math.min(1, availableWidth / (maxWidth * taskCount));
+            return Math.floor(maxWidth * scale);
         }
     }
     Behavior on implicitWidth {
@@ -250,10 +248,10 @@ PlasmaCore.ToolTipArea {
     onSmartLauncherEnabledChanged: {
         if (smartLauncherEnabled && !smartLauncherItem) {
             const smartLauncher = Qt.createQmlObject(`
-import aeroshell.taskmanager as TaskManagerApplet
+            import aeroshell.taskmanager as TaskManagerApplet
 
-TaskManagerApplet.SmartLauncherItem { }
-`, task);
+            TaskManagerApplet.SmartLauncherItem {  }
+            `, task);
 
             smartLauncher.launcherUrl = Qt.binding(() => model.LauncherUrlWithoutIcon);
 
@@ -489,7 +487,7 @@ TaskManagerApplet.SmartLauncherItem { }
         acceptedModifiers: Qt.NoModifier
         acceptedDevices: PointerDevice.TouchScreen | PointerDevice.Stylus
         onLongPressed: {
-            if(contextMenuTimer.showNormalMenu) {
+            if (contextMenuTimer.showNormalMenu) {
                 if(model.IsStartup) return;
 
                 contextMenuTimer.showNormalMenu = false;
@@ -557,35 +555,35 @@ TaskManagerApplet.SmartLauncherItem { }
     TapHandler {
         acceptedButtons: Qt.MiddleButton | Qt.BackButton | Qt.ForwardButton
         onTapped: (eventPoint, button) => {
-                      if (button === Qt.MiddleButton) {
-                          if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.NewInstance) {
-                              tasksModel.requestNewInstance(modelIndex());
-                              containerRect.loadingNewInstance = true;
-                          } else if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.Close) {
-                              tasksRoot.taskClosedWithMouseMiddleButton = model.WinIdList.slice()
-                              tasksModel.requestClose(modelIndex());
-                          } else if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.ToggleMinimized) {
-                              tasksModel.requestToggleMinimized(modelIndex());
-                          } else if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.ToggleGrouping) {
-                              tasksModel.requestToggleGrouping(modelIndex());
-                          } else if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.BringToCurrentDesktop) {
-                              tasksModel.requestVirtualDesktops(modelIndex(), [virtualDesktopInfo.currentDesktop]);
-                          }
-                      } else if (button === Qt.BackButton || button === Qt.ForwardButton) {
-                          const playerData = mpris2Source.playerForLauncherUrl(model.LauncherUrlWithoutIcon, model.AppPid);
-                          if (playerData) {
-                              if (button === Qt.BackButton) {
-                                  playerData.Previous();
-                              } else {
-                                  playerData.Next();
-                              }
-                          } else {
-                              eventPoint.accepted = false;
-                          }
-                      }
+            if (button === Qt.MiddleButton) {
+                if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.NewInstance) {
+                    tasksModel.requestNewInstance(modelIndex());
+                    containerRect.loadingNewInstance = true;
+                } else if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.Close) {
+                    tasksRoot.taskClosedWithMouseMiddleButton = model.WinIdList.slice()
+                    tasksModel.requestClose(modelIndex());
+                } else if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.ToggleMinimized) {
+                    tasksModel.requestToggleMinimized(modelIndex());
+                } else if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.ToggleGrouping) {
+                    tasksModel.requestToggleGrouping(modelIndex());
+                } else if (Plasmoid.configuration.middleClickAction === TaskManagerApplet.Backend.BringToCurrentDesktop) {
+                    tasksModel.requestVirtualDesktops(modelIndex(), [virtualDesktopInfo.currentDesktop]);
+                }
+            } else if (button === Qt.BackButton || button === Qt.ForwardButton) {
+                const playerData = mpris2Source.playerForLauncherUrl(model.LauncherUrlWithoutIcon, model.AppPid);
+                if (playerData) {
+                    if (button === Qt.BackButton) {
+                        playerData.Previous();
+                    } else {
+                        playerData.Next();
+                    }
+                } else {
+                    eventPoint.accepted = false;
+                }
+            }
 
-                      tasksRoot.cancelHighlightWindows();
-                  }
+            tasksRoot.cancelHighlightWindows();
+        }
     }
     Rectangle {
         id: containerRect
@@ -1236,7 +1234,6 @@ TaskManagerApplet.SmartLauncherItem { }
             imagePath: Qt.resolvedUrl("svgs/tasks.svg")
             prefix: basePrefix + (isHovered && (!Plasmoid.configuration.hoverFadeAnim && Plasmoid.configuration.disableHottracking) ? "-hover" : "")
 
-
             KSvg.FrameSvgItem {
                 anchors.fill: parent
 
@@ -1493,12 +1490,15 @@ TaskManagerApplet.SmartLauncherItem { }
 
     MouseArea {
         id: dragArea
+
         property alias taskIndex: task.index
-        hoverEnabled: true
-        enabled: ((tasksRoot.jumpListItem === jumpList) || (tasksRoot.jumpListItem === null))
-        propagateComposedEvents: true
+
         anchors.fill: parent
         anchors.margins: -1
+
+        hoverEnabled: true
+        enabled: (tasksRoot.jumpListItem === jumpList) || (tasksRoot.jumpListItem === null)
+        propagateComposedEvents: true
 
         onCanceled: {
             if(held) {
@@ -1695,6 +1695,7 @@ TaskManagerApplet.SmartLauncherItem { }
         if (!model.IsWindow) {
             taskInitComponent.createObject(task);
         }
+
         completed = true;
     }
 }

@@ -1,7 +1,22 @@
-import QtQuick
 
-import org.kde.plasma.plasmoid
-import org.kde.plasma.core as PlasmaCore
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts 1.1
+import QtQuick.Dialogs
+import QtQuick.Window 2.1
+
+import org.kde.plasma.plasmoid 2.0
+import org.kde.plasma.core 2.0 as PlasmaCore
+import org.kde.plasma.components 3.0 as PlasmaComponents
+import org.kde.plasma.extras 2.0 as PlasmaExtras
+
+import org.kde.plasma.private.kicker 0.1 as Kicker
+import org.kde.coreaddons as KCoreAddons // kuser
+import org.kde.plasma.private.shell 2.0
+
+import org.kde.kwindowsystem 1.0
+
+import org.kde.kirigami 2.13 as Kirigami
 
 /*
  * This is the Dialog that displays the Start menu orb when it sticks out
@@ -19,44 +34,17 @@ import org.kde.plasma.core as PlasmaCore
  *
  */
 
-PlasmaCore.Dialog {
+Window {
     id: iconUser
+    flags: Qt.WindowTransparentForInput | Qt.FramelessWindowHint
 
-    objectName: "orb"
-
-    // flags: Qt.WindowTransparentForInput
-    location: "Floating"
-    type: PlasmaCore.Dialog.Notification
-    title: "aeroshell-floatingorb"
-    backgroundHints: PlasmaCore.Types.NoBackground // Prevents a dialog SVG background from being drawn.
+    title: "__AEROSHELL_STARTORB"
+    color: "transparent"
 
     visible: stickOutOrb
-    onVisibleChanged: {
-        tim.start();
-    }
 
-    // The actual orb button, this dialog window is just a container for it.
-    mainItem: FloatingOrb {
+    FloatingOrb {
         id: floatingOrbIcon
-
-        Timer {
-            id: tim
-            property int c: 0
-            interval: 1
-            repeat: true
-            onTriggered: {
-                console.log("orb positioning start");
-                var pos = kicker.mapToGlobal(kicker.x, kicker.height);
-                console.log(pos);
-                iconUser.x = pos.x;
-                iconUser.y = Screen.height - iconUser.height;
-                console.log("orb positioning end");
-                Plasmoid.setOrb(orbW);
-
-                if (c++ == 5) {
-                    stop();
-                }
-            }
-        }
+        anchors.fill: parent
     }
 }

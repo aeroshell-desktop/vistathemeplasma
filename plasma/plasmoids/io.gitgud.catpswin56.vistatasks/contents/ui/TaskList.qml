@@ -23,14 +23,6 @@ ListView {
     property alias resetTransition: resetTransition
     property alias resetAddTransition: resetAddTransition
 
-    Text {
-        anchors.bottom: parent.bottom
-        anchors.left: parent.right
-        text: taskList.contentWidth
-        z: 1
-        color: "white"
-    }
-
     height: 30
 
     // Is this really needed?
@@ -60,7 +52,7 @@ ListView {
 
     boundsBehavior: Flickable.StopAtBounds
     rebound: Transition {}
-    // clip: true
+    clip: true
     interactive: false
     cacheBuffer: 9999
     spacing: 2

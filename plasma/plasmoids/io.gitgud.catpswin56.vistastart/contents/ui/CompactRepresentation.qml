@@ -22,9 +22,9 @@ import QtQuick.Layouts 1.1
 
 import org.kde.plasma.plasmoid 2.0
 import org.kde.plasma.core 2.0 as PlasmaCore
-import org.kde.kwindowsystem 1.0
 
 import org.kde.kirigami as Kirigami
+import org.kde.zones
 
 Item {
     id: root
@@ -35,6 +35,7 @@ Item {
     Layout.maximumWidth: floatingOrbPanel.scaledWidth;
     width: Layout.maximumWidth
     height: Layout.maximumHeight
+    property bool compositing: false
 
     Binding {
         target: kicker
@@ -64,7 +65,6 @@ Item {
     readonly property bool editMode: Plasmoid.containment.corona.editMode
     readonly property bool inPanel: (Plasmoid.location == PlasmaCore.Types.TopEdge || Plasmoid.location == PlasmaCore.Types.RightEdge || Plasmoid.location == PlasmaCore.Types.BottomEdge || Plasmoid.location == PlasmaCore.Types.LeftEdge)
     property bool menuShown: dashWindow.visible
-    property QtObject orbW: null
     property alias orbTimer: orbTimer
     readonly property var screenGeometry: Plasmoid.screenGeometry
 
@@ -73,40 +73,93 @@ Item {
     readonly property bool useCustomButtonImage: (Plasmoid.configuration.useCustomButtonImage)
     readonly property bool vertical: (Plasmoid.formFactor == PlasmaCore.Types.Vertical)
 
-	property vector2d orbPos: Qt.vector2d(0, 0)
+	property point orbPos: Qt.point(0, 0)
 
     // If the url is empty (default value), then use the fallback url. Otherwise, return the url path relative to
     // the location of the source code.
     function getResolvedUrl(url, fallback) {
+
         if (url.toString() === "" || !Plasmoid.fileExists(url)) {
             return Qt.resolvedUrl(fallback);
         }
         return url;
     }
-
     function positionOrb() {
-        console.log("positioning orb");
-    }
+        var pos = kicker.mapToGlobal(floatingOrbPanel.x, floatingOrbPanel.y);
+        orb.width = floatingOrbPanel.scaledWidth;
+        var height = floatingOrbPanel.scaledHeight / 3;
+        if(Plasmoid.configuration.offsetFloatingOrb) {
+            height -= 5;
+            pos.y += 5;
+            orb.mainItem.offset = 5;
+        }
+        orb.height = height;
 
+		orbPos = pos;
+
+        orb.ZoneItemAttached.requestPosition(orbPos);
+    }
     function showMenu() {
+		orb.visible = false;
         dashWindow.visible = !dashWindow.visible;
         dashWindow.showingAllPrograms = dashWindow.mainItemCount == 0;
         dashWindow.m_searchField.focus = true;
+		orb.visible = Qt.binding(() => stickOutOrb);
+
     }
+    function updateSizeHints() {
+        return;
+        /*if (useCustomButtonImage) {
+            if (vertical) {
+                var scaledHeight = Math.floor(parent.width * (floatingOrbPanel.buttonIcon.height / floatingOrbPanel.buttonIcon.width));
+                root.Layout.minimumHeight = scaledHeight;
+                root.Layout.maximumHeight = scaledHeight;
+                root.Layout.minimumWidth = Kirigami.Units.iconSizes.small;
+                root.Layout.maximumWidth = inPanel ? Kirigami.Units.iconSizes.medium : -1;
+            } else {
+                var scaledWidth = Math.floor(parent.height * (floatingOrbPanel.buttonIcon.width / floatingOrbPanel.buttonIcon.height));
+                root.Layout.minimumWidth = scaledWidth;
+                root.Layout.maximumWidth = scaledWidth;
+                root.Layout.minimumHeight = Kirigami.Units.iconSizes.small;
+                root.Layout.maximumHeight = inPanel ? Kirigami.Units.iconSizes.medium : -1;
+            }
+        } else {
+            root.Layout.minimumWidth = Kirigami.Units.iconSizes.small;
+            root.Layout.maximumWidth = inPanel ? Kirigami.Units.iconSizes.medium : -1;
+            root.Layout.minimumHeight = Kirigami.Units.iconSizes.small;
+            root.Layout.maximumHeight = inPanel ? Kirigami.Units.iconSizes.medium : -1;
+        }
+        if (stickOutOrb && orb) {
+            root.Layout.minimumWidth = orb.width + panelSvg.margins.right * (compositing ? 0 : 1);
+            root.Layout.maximumWidth = orb.width + panelSvg.margins.right * (compositing ? 0 : 1);
+            root.Layout.minimumHeight = orb.height;
+            root.Layout.maximumHeight = orb.height;
+        }*/
+    }
+
+    //kicker.status: PlasmaCore.Types.PassiveStatus
+    //Plasmoid.status: dashWindow && dashWindow.visible ? PlasmaCore.Types.RequiresAttentionStatus : PlasmaCore.Types.PassiveStatus
+    //clip: true
 
     Component.onCompleted: {
         dashWindow = Qt.createQmlObject("MenuRepresentation {}", kicker);
-        orbW = Qt.createQmlObject("StartOrb {}", kicker);
-        orbW.width = floatingOrbPanel.scaledWidth;
-        orbW.height = floatingOrbPanel.scaledHeight / 3;
-
-        positionOrb();
 
         orbTimer.start();
         Plasmoid.activated.connect(function () {
             showMenu();
         });
     }
+    onCompositingChanged: {
+        updateSizeHints();
+        positionOrb();
+    }
+    onHeightChanged: updateSizeHints()
+
+    onStickOutOrbChanged: {
+        updateSizeHints();
+        positionOrb();
+    }
+    onWidthChanged: updateSizeHints()
 
     Connections {
         target: Plasmoid.configuration
@@ -117,7 +170,6 @@ Item {
             positionOrb();
         }
     }
-
     Connections {
         function onScreenChanged() {
             orbTimer.start();
@@ -140,16 +192,16 @@ Item {
      * much space as they can in the compact representation while preserving their aspect
      * ratio.
      */
+
+
     FloatingOrb {
         id: floatingOrbPanel
-
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-
         objectName: "innerorb"
+        opacity: (!stickOutOrb)
 
-        opacity: !stickOutOrb
     }
 
     // Handles all mouse events for the popup orb
@@ -170,16 +222,32 @@ Item {
         z: 99
     }
 
+    PlasmaCore.Dialog {
+        id: orb
 
-    // Even worse, this just makes things even more unsophisticated. If someone has a better
-    // way of solving this, I would love to know.
+        ZoneItemAttached.zone: kicker.ZoneItemAttached.zone
+
+        flags: Qt.WindowTransparentForInput | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+        title: "__AEROSHELL_STARTORB"
+        type: "Notification"
+        backgroundHints: PlasmaCore.Types.NoBackground
+
+        visible: stickOutOrb
+
+        mainItem: FloatingOrb {
+            id: floatingOrbIcon
+        }
+    }
+
     Timer {
         id: orbTimer
 
         interval: 15
+        repeat: true
 
         onTriggered: {
-            Plasmoid.setOrb(orbW);
+            updateSizeHints();
+            positionOrb();
         }
     }
 }

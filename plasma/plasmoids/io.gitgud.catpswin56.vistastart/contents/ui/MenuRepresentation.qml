@@ -38,6 +38,7 @@ import org.kde.kwindowsystem
 import org.kde.ksvg as KSvg
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.kirigami as Kirigami
+import org.kde.zones
 
 import Qt5Compat.GraphicalEffects
 
@@ -48,6 +49,8 @@ PlasmaCore.Dialog {
     flags: Qt.WindowStaysOnTopHint //| Qt.Popup // Set to popup so that it is still considered a plasmoid popup, despite being a floating dialog window.
     hideOnWindowDeactivate: true
     appletInterface: kicker
+
+    ZoneItemAttached.zone: kicker.ZoneItemAttached.zone
 
 	title: "aeroshell-menurepresentation"
     

@@ -215,23 +215,6 @@ PlasmoidItem {
     property TaskManager.TasksModel tasksModel: TaskManager.TasksModel {
         id: tasksModel
 
-        readonly property int logicalLauncherCount: {
-            if (Plasmoid.configuration.separateLaunchers) {
-                return launcherCount;
-            }
-
-            var startupsWithLaunchers = 0;
-
-            for(var i = 0; i < tasksModel.count; ++i) {
-                var item = taskList.itemAtIndex(i);
-
-                if (item?.model?.IsStartup && item.model.HasLauncher) {
-                    ++startupsWithLaunchers;
-                }
-            }
-            return launcherCount + startupsWithLaunchers;
-        }
-
         virtualDesktop: virtualDesktopInfo.currentDesktop
         screenGeometry: Plasmoid.containment.screenGeometry
         activity: activityInfo.currentActivity
@@ -241,17 +224,10 @@ PlasmoidItem {
         filterByActivity: Plasmoid.configuration.showOnlyCurrentActivity
         filterNotMinimized: Plasmoid.configuration.showOnlyMinimized
 
-        hideActivatedLaunchers: true //tasks.iconsOnly || Plasmoid.configuration.hideLauncherOnStart
         sortMode: TaskManager.TasksModel.SortManual
-        launchInPlace: false
-        separateLaunchers: true
         groupMode: Plasmoid.configuration.groupPopups ? TaskManager.TasksModel.GroupApplications : TaskManager.TasksModel.GroupDisabled
         groupInline: !Plasmoid.configuration.groupPopups
         groupingWindowTasksThreshold: Plasmoid.configuration.onlyGroupWhenFull ? LayoutMetrics.optimumCapacity(width, height) + 1 : -1
-
-        onLauncherListChanged: {
-            Plasmoid.configuration.launchers = launcherList;
-        }
 
         onGroupingAppIdBlacklistChanged: {
             Plasmoid.configuration.groupingAppIdBlacklist = groupingAppIdBlacklist;
@@ -262,9 +238,6 @@ PlasmoidItem {
         }
 
         Component.onCompleted: {
-            if(Plasmoid.configuration.launchers)
-                launcherList = Plasmoid.configuration.launchers;
-
             groupingAppIdBlacklist = Plasmoid.configuration.groupingAppIdBlacklist;
             groupingLauncherUrlBlacklist = Plasmoid.configuration.groupingLauncherUrlBlacklist;
         }
@@ -327,6 +300,7 @@ PlasmoidItem {
     Item {
         anchors.fill: parent
         anchors.leftMargin: 1
+        anchors.rightMargin: taskList?.spacing ?? 4
 
         TaskManager.VirtualDesktopInfo {
             id: virtualDesktopInfo
@@ -414,11 +388,8 @@ PlasmoidItem {
 
             property bool aeroshellLibplasma: false
 
-            anchors {
-                left: parent.left
-                leftMargin: 1
-                right: parent.right
-            }
+            anchors.left: parent.left
+            anchors.right: parent.right
 
             height: 30
 

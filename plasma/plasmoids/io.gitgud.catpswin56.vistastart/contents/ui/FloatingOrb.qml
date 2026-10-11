@@ -62,10 +62,12 @@ Item {
     property real aspectRatio: buttonIconSizes.height === 0 ? 1 : (buttonIconSizes.width / buttonIconSizes.height)
     property int scaledWidth: Plasmoid.configuration.orbWidth === 1 ? buttonIconSizes.width : Plasmoid.configuration.orbWidth
     property int scaledHeight: scaledWidth / aspectRatio
+    property int offset: 0
 
     Image {
         id: buttonIcon
         anchors.centerIn: parent
+        anchors.verticalCenterOffset: floatingOrb.offset
         smooth: true
         source: floatingOrb.orbTexture
         sourceClipRect: Qt.rect(0, 0, buttonIconSizes.width, buttonIconSizes.height / 3);
@@ -76,6 +78,7 @@ Item {
     Image {
         id: buttonIconPressed
         anchors.centerIn: parent
+        anchors.verticalCenterOffset: floatingOrb.offset
         visible: dashWindow.visible
         smooth: true
         source: floatingOrb.orbTexture
@@ -88,6 +91,7 @@ Item {
     Image {
         id: buttonIconHovered
         anchors.centerIn: parent
+        anchors.verticalCenterOffset: floatingOrb.offset
         source: floatingOrb.orbTexture
         smooth: true
         opacity: mouseArea.containsMouse || mouseAreaCompositingOff.containsMouse

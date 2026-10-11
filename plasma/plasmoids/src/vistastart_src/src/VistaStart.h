@@ -42,6 +42,7 @@ Q_SIGNALS:
 
 public Q_SLOTS:
     void onShowingDesktopChanged(bool enabled);
+    void reposition();
 
 private:
     QQuickWindow *m_orbWindow;

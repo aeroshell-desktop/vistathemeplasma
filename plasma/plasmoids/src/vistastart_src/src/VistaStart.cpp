@@ -84,10 +84,29 @@ bool VistaStart::fileExists(QUrl path)
     return file.exists() && file.isFile();
 }
 
+void VistaStart::reposition()
+{
+    if (!m_orbWindow) {
+        return;
+    }
+
+    auto w = PlasmaShellWaylandIntegration::get(m_orbWindow);
+    if (w) {
+        qDebug() << w;
+        w->setPosition(m_orbWindow->position());
+        w->setPanelBehavior(QtWayland::org_kde_plasma_surface::panel_behavior_always_visible);
+        w->setRole(QtWayland::org_kde_plasma_surface::role_panel);
+    }
+}
+
 void VistaStart::setOrb(QQuickWindow* w)
 {
-    PlasmaShellWaylandIntegration::get(w)->setPosition(w->position());
     m_orbWindow = w;
+
+    connect(m_orbWindow, &QQuickWindow::xChanged, this, &VistaStart::reposition);
+    connect(m_orbWindow, &QQuickWindow::yChanged, this, &VistaStart::reposition);
+    connect(m_orbWindow, &QQuickWindow::widthChanged, this, &VistaStart::reposition);
+    connect(m_orbWindow, &QQuickWindow::heightChanged, this, &VistaStart::reposition);
 }
 
 void VistaStart::onShowingDesktopChanged(bool enabled)
