@@ -185,7 +185,7 @@ Item {
                 }
                 case 5: {
                     addWatermark(0, "VistaThemePlasma", false, "FFFFFF", 2);
-                    addWatermark(0, "Build 6.6.2", false, "FFFFFF", 2);
+                    addWatermark(0, "Build 6.8.0", false, "FFFFFF", 2);
                     break;
                 }
             }

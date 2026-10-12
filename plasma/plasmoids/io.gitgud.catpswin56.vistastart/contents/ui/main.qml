@@ -24,7 +24,6 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.private.kicker 0.1 as Kicker
 import org.kde.kquickcontrolsaddons as KQuickControlsAddons
-import org.kde.kwindowsystem
 import org.kde.ksvg as KSvg
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasma5support as Plasma5Support
@@ -40,7 +39,7 @@ PlasmoidItem {
     property QtObject dashWindow: null
     property QtObject globalFavorites: rootModel.favoritesModel
     property QtObject systemFavorites: rootModel.systemFavoritesModel
-    property bool compositingEnabled: KWindowSystem.isPlatformX11 ? KX11Extras.compositingActive : true
+    property bool compositingEnabled: true
 
     Plasmoid.constraintHints: Plasmoid.CanFillArea
     activationTogglesExpanded: false

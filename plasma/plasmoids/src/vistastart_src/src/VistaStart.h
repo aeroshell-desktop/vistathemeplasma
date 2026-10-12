@@ -7,7 +7,6 @@
 #define VISTASTART_H
 
 #include <QUrl>
-#include <QQuickWindow>
 #include <QVariant>
 #include <QVariantList>
 
@@ -35,17 +34,8 @@ public:
 
     Q_INVOKABLE bool fileExists(QUrl path);
 
-    Q_INVOKABLE void setOrb(QQuickWindow* w);
-
 Q_SIGNALS:
     void defaultsChanged();
-
-public Q_SLOTS:
-    void onShowingDesktopChanged(bool enabled);
-    void reposition();
-
-private:
-    QQuickWindow *m_orbWindow;
 };
 
 #endif

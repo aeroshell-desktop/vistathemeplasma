@@ -13,7 +13,6 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.ksvg as KSvg
 import org.kde.plasma.components as PC3
 import org.kde.kquickcontrolsaddons
-import org.kde.kwindowsystem
 import org.kde.draganddrop as DragDrop
 import org.kde.kirigami as Kirigami
 
@@ -82,12 +81,7 @@ ContainmentItem {
     property bool dragAndDropping: false
     // True when e.g. the task manager is drag and dropping tasks.
     property bool appletRequestsInhibitDnD: false
-    property string hasCompositing: {
-        if(KWindowSystem.isPlatformX11) {
-            if(KX11Extras.compositingActive) return "";
-                else return "-nocomp";
-        } else return "";
-    }
+    property string hasCompositing: ""
 
 //END properties
 

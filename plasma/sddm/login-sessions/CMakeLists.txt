@@ -8,10 +8,10 @@ install(
                 ${CMAKE_INSTALL_FULL_BINDIR}
 )
 
-configure_file(vistathemeplasma.desktop.cmake ${CMAKE_CURRENT_BINARY_DIR}/${PLASMA_WAYLAND_DESKTOP_FILENAME})
+configure_file(vistathemeplasma.desktop.cmake ${CMAKE_CURRENT_BINARY_DIR}/vistathemeplasma.desktop)
 install(
         FILES
-                ${CMAKE_CURRENT_BINARY_DIR}/${PLASMA_WAYLAND_DESKTOP_FILENAME}
+                ${CMAKE_CURRENT_BINARY_DIR}/vistathemeplasma.desktop
         DESTINATION
                 ${KDE_INSTALL_DATADIR}/wayland-sessions
 )

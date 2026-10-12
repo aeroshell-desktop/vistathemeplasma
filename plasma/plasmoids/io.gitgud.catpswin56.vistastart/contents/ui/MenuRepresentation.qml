@@ -139,10 +139,8 @@ PlasmaCore.Dialog {
 
     onSearchingChanged: {
         if (!searching) {
-			if(!KWindowSystem.isPlatformX11) {
-				root.hideOnWindowDeactivate = false;
-				wayland_fix.start();
-			}
+			root.hideOnWindowDeactivate = false;
+			wayland_fix.start();
 			reset();
 
         }
