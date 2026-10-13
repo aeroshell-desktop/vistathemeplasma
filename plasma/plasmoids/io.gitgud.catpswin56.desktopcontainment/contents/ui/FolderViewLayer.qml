@@ -393,10 +393,10 @@ FocusScope {
                 Plasmoid.contextualActions.push(actionSeparator);
             }
             if (actionName === "refresh") {
-                Plasmoid.contextualActions.push(viewPropertiesAction)
-                Plasmoid.contextualActions.push(viewSortMenu)
+                Plasmoid.contextualActions.push(viewPropertiesAction);
+                Plasmoid.contextualActions.push(viewSortMenu);
             }
-            Plasmoid.contextualActions.push(modelAction)
+            Plasmoid.contextualActions.push(modelAction);
             if (actionName === "refresh") {
                 Plasmoid.contextualActions.push(actionSeparatorSecond);
             }

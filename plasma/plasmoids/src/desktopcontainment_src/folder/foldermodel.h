@@ -324,6 +324,7 @@ Q_SIGNALS:
     void selectionDone();
     void creatingNewItemsChanged() const;
     void selectionCountChanged() const;
+    void hasRefreshed();
 
 protected:
     bool filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const override;

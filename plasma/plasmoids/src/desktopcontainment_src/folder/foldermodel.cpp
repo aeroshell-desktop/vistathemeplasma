@@ -545,8 +545,7 @@ void FolderModel::setUsedByContainment(bool used)
         QAction *action = m_actionCollection.action(QStringLiteral("refresh"));
 
         if (action) {
-            action->setText(m_usedByContainment ? i18n("&Refresh Desktop") : i18n("&Refresh View"));
-            action->setIcon(m_usedByContainment ? QIcon::fromTheme(QStringLiteral("user-desktop")) : QIcon::fromTheme(QStringLiteral("view-refresh")));
+            action->setText(i18n("&Refresh"));
         }
 
         m_screenMapper->disconnect(this);
@@ -1837,7 +1836,7 @@ void FolderModel::createActions()
     QAction *paste = KStandardAction::paste(this, &FolderModel::paste, this);
     QAction *pasteTo = KStandardAction::paste(this, &FolderModel::pasteTo, this);
 
-    QAction *refresh = new QAction(QIcon::fromTheme(QStringLiteral("view-refresh")), i18n("&Refresh View"), this);
+    QAction *refresh = new QAction(QIcon(), i18n("&Refresh"), this);
     refresh->setShortcut(QKeySequence(QKeySequence::Refresh));
     connect(refresh, &QAction::triggered, this, &FolderModel::refresh);
 
@@ -2273,6 +2272,7 @@ void FolderModel::refresh()
     Q_EMIT errorStringChanged();
 
     m_dirModel->dirLister()->updateDirectory(m_dirModel->dirLister()->url());
+    Q_EMIT hasRefreshed();
 }
 
 Plasma::Applet *FolderModel::applet() const

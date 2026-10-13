@@ -117,11 +117,6 @@ Item {
             }
             showMessage(authenticator.errorMessage, "dialog-error");
         }
-        function onPromptForSecretChanged() {
-            if (authenticator.promptForSecret == "") {
-                return;
-            }
-        }
         function onSucceeded() {
             keepActiveTimer.stop();
             lockSuccess.play();
@@ -359,7 +354,6 @@ Item {
                                 anchors.fill: parent
 
                                 hoverEnabled: true
-                                // enabled: !authenticator.busy
                                 onClicked: root.beginAuth();
                             }
                         }
