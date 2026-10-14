@@ -194,14 +194,12 @@ void Sidebar::configureWindow()
         m_layerWindow->setAnchors(anchors);
         m_shellWindow->setPanelBehavior(QtWayland::org_kde_plasma_surface::panel_behavior_always_visible);
 
-        if (!m_reserveScreenArea && m_docked) {
+        if (!m_reserveScreenArea) {
             m_layerWindow->setExclusiveZone(0);
             m_layerWindow->setLayer(LayerShellQt::Window::LayerBottom);
             m_layerWindow->setScope(QStringLiteral(""));
             m_docked = false;
-        }
-
-        if (m_reserveScreenArea) {
+        } else if (m_reserveScreenArea) {
             m_layerWindow->setExclusiveZone(rect.width());
             m_layerWindow->setLayer(LayerShellQt::Window::LayerTop);
             m_layerWindow->setScope(QStringLiteral("dock"));
