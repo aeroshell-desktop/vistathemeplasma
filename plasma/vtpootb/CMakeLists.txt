@@ -8,6 +8,7 @@ ecm_setup_version(${PROJECT_VERSION}
     VARIABLE_PREFIX VTPOOTB
     VERSION_HEADER "${CMAKE_CURRENT_BINARY_DIR}/src/version-vtpootb.h"
 )
+configure_file(config.h.cmake src/config.h)
 
 add_executable(vtpootbcursor_authhelper src/ootbauthhelper.cpp src/ootbauthhelper.h)
 target_link_libraries(vtpootbcursor_authhelper KF6::AuthCore KF6::ConfigCore KF6::I18n Qt6::DBus Qt6::Core)
