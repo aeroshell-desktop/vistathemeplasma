@@ -19,7 +19,7 @@
       <default>true</default>
     </entry>
     <entry name="orbWidth" type="Int">
-      <default>1</default>
+      <default>0</default>
     </entry>
     <entry name="enableShadow" type="Bool">
       <default>true</default>
