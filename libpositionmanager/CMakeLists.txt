@@ -1,21 +1,17 @@
 set(positionmanagerplugin_SRCS
-    positionmanager.cpp
+    positionmanagerplugin.cpp positionmanager.cpp
 )
 
-add_library(positionmanager SHARED ${positionmanagerplugin_SRCS})
+add_library(positionmanagerplugin SHARED ${positionmanagerplugin_SRCS})
 
-target_link_libraries(positionmanager
+target_link_libraries(positionmanagerplugin
     PRIVATE
-        Qt6::Core
-        Qt6::Widgets
+        Qt6::Core Qt6::DBus Qt6::Qml
         Qt6::Quick
+
+        KF6::ConfigCore
 )
 
-ecm_add_qml_module(positionmanager
-    URI "vistathemeplasma.positionmanager"
-    VERSION 0.1
-    GENERATE_PLUGIN_SOURCE
-    DEPENDENCIES QtCore
-)
-ecm_finalize_qml_module(positionmanager)
+install(TARGETS positionmanagerplugin DESTINATION ${KDE_INSTALL_QMLDIR}/vistathemeplasma/positionmanager)
+install(FILES qmldir DESTINATION ${KDE_INSTALL_QMLDIR}/vistathemeplasma/positionmanager)
 

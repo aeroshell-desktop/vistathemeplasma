@@ -18,7 +18,7 @@ class PositionManager : public QObject
     Q_PROPERTY(QJsonArray positions READ positions WRITE setPositions NOTIFY refreshed)
 
 public:
-    explicit PositionManager(QObject *parent = nullptr);
+    PositionManager(QObject *parent = nullptr);
     ~PositionManager();
 
     QQuickItem *container();
