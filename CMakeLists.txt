@@ -1,16 +1,15 @@
 cmake_minimum_required(VERSION 3.16)
 project(vistathemeplasma-desktop)
 
+set(PROJECT_VERSION "6.8.1")
+set(PROJECT_VERSION_MAJOR 6)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
 
 find_package(ECM 6.0.0 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
-
-set(PROJECT_VERSION "6.8.0")
-set(PROJECT_VERSION_MAJOR 6)
-
-set(CMAKE_AUTOMOC ON)
 
 include(KDEInstallDirs)
 include(KDECMakeSettings)

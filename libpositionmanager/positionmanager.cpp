@@ -3,16 +3,19 @@
 #include <QJsonValue>
 
 PositionManager::PositionManager(QObject *parent)
-    : QObject{parent}
-    , m_refreshAutomatically{false}
-{}
+    : QObject(parent)
+    , m_refreshAutomatically(false)
+{
+}
 
 PositionManager::~PositionManager()
-{}
-
+{
+}
 
 QQuickItem *PositionManager::container()
-{ return m_container.data(); }
+{
+    return m_container.data();
+}
 
 void PositionManager::setContainer(QQuickItem *container)
 {
@@ -23,9 +26,10 @@ void PositionManager::setContainer(QQuickItem *container)
     Q_EMIT containerChanged();
 }
 
-
 bool PositionManager::refreshAutomatically()
-{ return m_refreshAutomatically; }
+{
+    return m_refreshAutomatically;
+}
 
 void PositionManager::setRefreshAutomatically(bool refreshAutomatically)
 {
@@ -33,9 +37,10 @@ void PositionManager::setRefreshAutomatically(bool refreshAutomatically)
     Q_EMIT refreshAutomaticallyChanged();
 }
 
-
 QJsonArray PositionManager::positions()
-{ return m_positions; }
+{
+    return m_positions;
+}
 
 void PositionManager::setPositions(QJsonArray positions)
 {
@@ -45,7 +50,9 @@ void PositionManager::setPositions(QJsonArray positions)
 
 QJsonObject PositionManager::getPositionObject(QQuickItem *item)
 {
-    if(!m_container) return {};
+    if (!m_container) {
+        return {};
+    }
 
     int index = item->property("posIdx").toInt();
     QString id = item->property("posId").toString();
@@ -56,7 +63,9 @@ QJsonObject PositionManager::getPositionObject(QQuickItem *item)
         return objIdx == index && objId == id;
     });
 
-    if(it != m_positions.end()) return (*it).toObject();
+    if (it != m_positions.end()) {
+        return (*it).toObject();
+    }
 
     return {};
 }
@@ -64,16 +73,19 @@ QJsonObject PositionManager::getPositionObject(QQuickItem *item)
 
 void PositionManager::ensurePositions()
 {
-    if(!m_container) return;
+    if (!m_container) {
+        return;
+    }
 
     // disable temporarily
     bool prevVal = m_refreshAutomatically;
     m_refreshAutomatically = false;
 
-    for(QQuickItem *item : m_container->childItems()) {
+    for (QQuickItem *item : m_container->childItems()) {
         QJsonObject obj = getPositionObject(item);
-
-        if(obj.isEmpty()) continue;
+        if (obj.isEmpty()) {
+            continue;
+        }
 
         item->setX(obj.value("x").toDouble());
         item->setY(obj.value("y").toDouble());
@@ -87,17 +99,21 @@ void PositionManager::ensurePositions()
 
 void PositionManager::refresh()
 {
-    if(!m_container) return;
+    if (!m_container) {
+        return;
+    }
 
     Q_EMIT aboutToRefresh();
 
     m_positions = QJsonArray{};
-    for(QQuickItem *item : m_container->childItems()) {
+    for (QQuickItem *item : m_container->childItems()) {
         int index = item->property("posIdx").toInt();
         QString id = item->property("posId").toString();
 
         // this item doesn't want to appear in the list
-        if(index == -1) continue;
+        if (index == -1) {
+            continue;
+        }
 
         QJsonObject obj{};
 
@@ -116,20 +132,26 @@ void PositionManager::refresh()
     Q_EMIT refreshed();
 }
 
-
 void PositionManager::checkRefresh()
-{ if(m_refreshAutomatically) refresh(); }
-
+{
+    if (m_refreshAutomatically) {
+        refresh();
+    }
+}
 
 void PositionManager::setupConnections()
 {
-    if(!m_container) return;
+    if (!m_container) {
+        return;
+    }
 
     connect(m_container.data(), &QQuickItem::visibleChildrenChanged, this, &PositionManager::checkRefresh);
     connect(m_container.data(), &QQuickItem::childrenRectChanged, this, &PositionManager::checkRefresh);
 
-    for(QQuickItem *item : m_container->childItems()) {
-        if(item->property("posIdx").toInt() == -1) continue;
+    for (QQuickItem *item : m_container->childItems()) {
+        if (item->property("posIdx").toInt() == -1) {
+            continue;
+        }
 
         connect(item, &QQuickItem::xChanged, this, &PositionManager::checkRefresh);
         connect(item, &QQuickItem::yChanged, this, &PositionManager::checkRefresh);
@@ -141,13 +163,17 @@ void PositionManager::setupConnections()
 
 void PositionManager::unsetupConnections()
 {
-    if(!m_container) return;
+    if (!m_container) {
+        return;
+    }
 
     disconnect(m_container.data(), &QQuickItem::visibleChildrenChanged, this, &PositionManager::checkRefresh);
     disconnect(m_container.data(), &QQuickItem::childrenRectChanged, this, &PositionManager::checkRefresh);
 
-    for(QQuickItem *item : m_container->childItems()) {
-        if(item->property("posIdx").toInt() == -1) continue;
+    for (QQuickItem *item : m_container->childItems()) {
+        if (item->property("posIdx").toInt() == -1) {
+            continue;
+        }
 
         disconnect(item, &QQuickItem::xChanged, this, &PositionManager::checkRefresh);
         disconnect(item, &QQuickItem::yChanged, this, &PositionManager::checkRefresh);
